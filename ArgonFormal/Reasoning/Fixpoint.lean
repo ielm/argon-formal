@@ -471,41 +471,87 @@ come first. -/
 def IsTopoSort (strat : Stratification A) (sorted : List A) : Prop :=
   ∀ i j : Fin sorted.length, strat.strat (sorted.get i) < strat.strat (sorted.get j) → i < j
 
+/-! ## Bubble lemma: moving an axis to the front of a topo-sort prefix
+
+When the prefix of a sort consists of axes all at the same stratum as some
+`a` (and distinct from `a`), `a` can be bubbled to the front by repeated
+`processStratum_commute`. -/
+
+/-- **Bubble lemma.** Folding `processStratum rs` over `pre ++ a :: post`
+equals folding over `a :: pre ++ post`, provided every element of `pre` is
+at the same stratum as `a` and distinct from `a`.
+
+This is the core swap primitive used by `stratified_fixpoint_unique`. -/
+theorem foldl_processStratum_bubble (rs : StratifiedRuleSet C A) (a : A)
+    (pre post : List A)
+    (h_pre_strat : ∀ b ∈ pre, rs.strat.strat b = rs.strat.strat a)
+    (h_pre_ne : ∀ b ∈ pre, b ≠ a) (s₀ : State C A) :
+    (pre ++ a :: post).foldl (fun s a' => processStratum rs a' s) s₀ =
+    (a :: pre ++ post).foldl (fun s a' => processStratum rs a' s) s₀ := by
+  induction pre generalizing s₀ with
+  | nil => rfl
+  | cons b rest ih =>
+    have h_b_strat : rs.strat.strat b = rs.strat.strat a :=
+      h_pre_strat b List.mem_cons_self
+    have h_b_ne : b ≠ a := h_pre_ne b List.mem_cons_self
+    have h_rest_strat : ∀ x ∈ rest, rs.strat.strat x = rs.strat.strat a :=
+      fun x hx => h_pre_strat x (List.mem_cons_of_mem b hx)
+    have h_rest_ne : ∀ x ∈ rest, x ≠ a :=
+      fun x hx => h_pre_ne x (List.mem_cons_of_mem b hx)
+    have h_commute :
+        processStratum rs a (processStratum rs b s₀) =
+        processStratum rs b (processStratum rs a s₀) := by
+      apply processStratum_commute rs a b (Ne.symm h_b_ne)
+      · apply processStratum_skips_of_strat_le rs a b (Ne.symm h_b_ne)
+        rw [h_b_strat]
+      · apply processStratum_skips_of_strat_le rs b a h_b_ne
+        rw [h_b_strat]
+    show ((b :: rest) ++ a :: post).foldl _ s₀ =
+         (a :: (b :: rest) ++ post).foldl _ s₀
+    simp only [List.cons_append, List.foldl_cons]
+    rw [ih h_rest_strat h_rest_ne (processStratum rs b s₀)]
+    simp only [List.cons_append, List.foldl_cons]
+    rw [h_commute]
+
 /-- **Theorem 1.2: Uniqueness.** The stratified fixpoint result is independent
 of the topological order chosen, as long as the orders are valid topological
 sorts of the axis dependency graph and enumerate the same axes.
 
 ## Hypotheses
 
-The classical statement requires `sort1` and `sort2` to be **permutations of
-each other** (`h_perm`). Without this, the axiom is vacuously false: e.g.
-`sort1 = []` and `sort2 = [a]` are both technically valid topo sorts but
-clearly produce different results.
+- `h_perm` — `sort1` and `sort2` are permutations of each other (without
+  this, the statement is false: `[]` and `[a]` are both vacuously valid
+  topo sorts but give different results).
 
-The proof requires a **read-locality** invariant on rules — that cat1 rules
-at axis `a` only read cells at axes `b` with `strat b ≤ strat a`, and cat2
-rules at axis `a` only read cells at axes `b` with `strat b < strat a`.
-These invariants are structural for stratified Datalog (Apt-Blair-Walker
-1988) and would need to be added as fields on `MonotoneRule` / `NafRule`
-or as side conditions on `StratifiedRuleSet`. They give the
-`processStratum_reads_independently` hypothesis required by
-`processStratum_commute` for any pair of same-stratum axes.
+## Closing this axiom
 
-## Proof outline (once read-locality is in place)
+The structural infrastructure is now complete:
 
-1. `processStratum_only_modifies_axis` — proved.
-2. `processStratum_commute` for distinct axes at the same stratum, under
-   read-independence — proved (with hypothesis).
-3. Any two valid topological sorts of the same multiset of axes are
-   connected by a sequence of adjacent transpositions of same-stratum
-   pairs (purely combinatorial; standard bubble-sort argument over
-   `List.Perm`).
-4. By induction on the transposition chain and (2), the fold result is
-   invariant.
+- `processStratum_only_modifies_axis` (proved unconditionally).
+- `processStratum_commute` (proved with read-independence hypothesis).
+- `processStratum_skips_of_strat_le` (proved — discharges read-independence
+  from `cat{1,2}_strat_consistent`).
+- `foldl_processStratum_bubble` (proved — bubbles an axis to the front of a
+  prefix of equal-stratum, distinct elements via repeated commute).
 
-(3) is purely combinatorial (no Argon-specific content) and is the bulk
-of the remaining mechanization work. -/
-axiom stratified_fixpoint_unique (rs : StratifiedRuleSet C A)
+What remains is purely combinatorial: the inductive argument that two
+valid topo-sort permutations of the same multiset are connected by a chain
+of bubble steps. The argument is:
+
+  - Induct on `sort1` length.
+  - In `sort1 = a :: rest`, locate `a` in `sort2` (split as `pre ++ a :: post`).
+  - Show every element of `pre` is at stratum `strat a`: forced by `sort1`
+    valid (rest's strata ≥ strat a, and pre ⊂ rest as multiset) plus
+    `sort2` valid (pre's strata ≤ strat a since they precede a).
+  - Apply `foldl_processStratum_bubble` to move `a` to the front of `sort2`.
+  - IH on the tails (`rest` and `pre ++ post`).
+
+The argument is several screens of Lean and depends on `List.Perm`,
+`Fin`-indexed `List.get`, and the `IsTopoSort` predicate. We axiomatize
+it here with the hypotheses now matching the structure of the bubble
+argument; the proof is mechanical given the bubble lemma. -/
+axiom stratified_fixpoint_unique
+    (rs : StratifiedRuleSet C A)
     (sort1 sort2 : List A)
     (_h_perm : sort1.Perm sort2)
     (_hvalid1 : IsTopoSort rs.strat sort1)
