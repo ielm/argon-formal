@@ -669,53 +669,274 @@ theorem stratified_fixpoint_unique
     stratifiedFixpoint rs sort2 State.initial :=
   stratified_fixpoint_unique_general rs sort1 sort2 h_perm h_nodup hvalid1 hvalid2 _
 
-/-- **Theorem 1.3: Stability.** The result is a fixpoint — no rule
-application would change any assignment.
+/-! ## Helpers for stability
 
-## Proof outline
+`foldl_processStratum_preserves_off_list` is the workhorse: folding
+`processStratum` over a list `l` of axes preserves any cell whose axis
+is not in `l`. -/
 
-## Hypotheses
+/-- Folding `processStratum` over `l` preserves cells at axes ∉ `l`. -/
+theorem foldl_processStratum_preserves_off_list (rs : StratifiedRuleSet C A)
+    (l : List A) (s : State C A) (b : A) (h_not_in : b ∉ l) (c : C) :
+    (l.foldl (fun s a => processStratum rs a s) s) c b = s c b := by
+  induction l generalizing s with
+  | nil => rfl
+  | cons a' rest ih =>
+    have h_b_ne_a' : b ≠ a' := fun heq => h_not_in (heq ▸ List.mem_cons_self)
+    have h_b_not_in_rest : b ∉ rest := fun h => h_not_in (List.mem_cons_of_mem a' h)
+    simp only [List.foldl]
+    rw [ih (processStratum rs a' s) h_b_not_in_rest]
+    exact processStratum_only_modifies_axis rs a' s c b h_b_ne_a'
 
-The proof requires the same **read-locality** invariant as
-`stratified_fixpoint_unique` — cat1 rules at axis `a` only read cells at
-axes `b` with `strat b ≤ strat a`, and cat2 rules at axis `a` only read
-cells at axes `b` with `strat b < strat a`. Without read-locality, a
-cat1 rule could re-fire after later strata add new NOT values, breaking
-stability.
+/-- Variant: folding preserves at axes with stratum strictly below the minimum
+stratum in `l`. Specifically, if every axis in `l` has stratum ≥ k, then any
+axis at stratum < k is preserved. -/
+theorem foldl_processStratum_preserves_below_strata (rs : StratifiedRuleSet C A)
+    (l : List A) (s : State C A) (b : A)
+    (h_strat : ∀ a' ∈ l, rs.strat.strat b < rs.strat.strat a') (c : C) :
+    (l.foldl (fun s a => processStratum rs a s) s) c b = s c b := by
+  apply foldl_processStratum_preserves_off_list
+  intro h_in
+  have := h_strat b h_in
+  exact lt_irrefl _ this
 
-## Proof outline (once read-locality is in place)
+/-! ## A cat1 rule remains a fixpoint after cat2 + suffix processing
 
-For axis `a` at stratum k, `processStratum` first runs Cat1 to fixpoint,
-then applies Cat2.
+The structural conditions (strict stratification of read_axes, frame_local
+per-cell, only_adds_is) make this provable: cat1 fires identically before
+and after cat2 because (a) read inputs are strictly-lower strata, frozen
+across cat2 and the suffix; (b) on axis a, only_adds_is preserves IS and
+NOT cells, and frame_local + per-cell agreement preserves CAN cells. -/
 
-- **Cat1 stability**: At axis `a`'s processing time, cat1 ran to a
-  fixpoint of `composeMonotone (rs.cat1 a)`. By
-  `composeMonotone_fixpoint_each_rule`, every individual cat1 rule for
-  axis `a` fixes that state. After cat2 runs at axis `a`, axis-a cells
-  may flip CAN→NOT. Under read-locality (cat1 rules don't read axis a's
-  NOT values), each cat1 rule still fires the same way: its trigger
-  condition reads only strata ≤ k, and strata < k are unchanged from
-  when cat1 was at fixpoint.
+/-- A cat1 rule remains a fixpoint of any state that (a) agrees with `s` on
+the rule's read_axes (typically strict-lower strata, frozen post-cat1) and
+(b) preserves IS values on the rule's axis (only_adds_is allows CAN→NOT or
+"unchanged" on axis cells). -/
+private theorem MonotoneRule.fixes_post_cat1
+    (r : MonotoneRule C A) (s t : State C A)
+    (h_fixes_s : r.apply s = s)
+    (h_read_eq : ∀ c b, b ∈ r.read_axes → s c b = t c b)
+    (h_axis_preserve : ∀ c, s c r.axis = .can ∨ t c r.axis = s c r.axis) :
+    r.apply t = t := by
+  funext c x
+  by_cases hxa : x = r.axis
+  · rw [hxa]
+    by_cases h_can : t c r.axis = .can
+    · have h_s_can : s c r.axis = .can := by
+        rcases h_axis_preserve c with h | h
+        · exact h
+        · exact h.symm.trans h_can
+      have h_at_axis_eq : s c r.axis = t c r.axis := by rw [h_s_can, h_can]
+      have h_apply_eq : r.apply s c r.axis = r.apply t c r.axis :=
+        r.frame_local s t h_read_eq c h_at_axis_eq
+      have h_apply_s : r.apply s c r.axis = s c r.axis := by
+        conv_lhs => rw [h_fixes_s]
+      -- Chain: r.apply t c r.axis = r.apply s c r.axis = s c r.axis = .can = t c r.axis.
+      calc r.apply t c r.axis
+          = r.apply s c r.axis := h_apply_eq.symm
+        _ = s c r.axis := h_apply_s
+        _ = .can := h_s_can
+        _ = t c r.axis := h_can.symm
+    · exact r.only_adds_is t c h_can
+  · exact r.axis_local t c x hxa
 
-- **Cat2 stability**: Each cat2 rule's `only_adds_not` field forces
-  `r.apply s ≠ s ↔ s c r.axis = .can`. Under read-locality (cat2 reads
-  only strata < k), cat2 rule firing is determined by strata < k state,
-  which doesn't change after stratum k is processed. So cat2 rules at
-  axis a remain stable.
+/-- Symmetric form for NAF rules. -/
+private theorem NafRule.fixes_post_cat2
+    (r : NafRule C A) (s t : State C A)
+    (h_fixes_s : r.apply s = s)
+    (h_read_eq : ∀ c b, b ∈ r.read_axes → s c b = t c b)
+    (h_axis_preserve : ∀ c, s c r.axis = .can ∨ t c r.axis = s c r.axis) :
+    r.apply t = t := by
+  funext c x
+  by_cases hxa : x = r.axis
+  · rw [hxa]
+    by_cases h_can : t c r.axis = .can
+    · have h_s_can : s c r.axis = .can := by
+        rcases h_axis_preserve c with h | h
+        · exact h
+        · exact h.symm.trans h_can
+      have h_at_axis_eq : s c r.axis = t c r.axis := by rw [h_s_can, h_can]
+      have h_apply_eq : r.apply s c r.axis = r.apply t c r.axis :=
+        r.frame_local s t h_read_eq c h_at_axis_eq
+      have h_apply_s : r.apply s c r.axis = s c r.axis := by
+        conv_lhs => rw [h_fixes_s]
+      calc r.apply t c r.axis
+          = r.apply s c r.axis := h_apply_eq.symm
+        _ = s c r.axis := h_apply_s
+        _ = .can := h_s_can
+        _ = t c r.axis := h_can.symm
+    · by_contra h_ne
+      have h_change : (r.apply t) c r.axis ≠ t c r.axis := h_ne
+      have := (r.only_adds_not t c h_change).1
+      exact h_can this
+  · exact r.axis_local t c x hxa
 
-- For axes processed LATER (stratum > k): by `processStratum_only_modifies_axis`,
-  axis `a` cells are unchanged. Stability is preserved.
+/-! ## `cat2Apply` produces a state where each cat2 rule is a fixpoint
 
-Lifting through the full fold and the topological order is mechanical
-once the per-stratum stability lemma is in place. -/
-axiom stratified_fixpoint_stable (rs : StratifiedRuleSet C A)
-    (axisSorted : List A) :
-    (∀ a, ∀ r ∈ rs.cat1 a,
-      r.apply (stratifiedFixpoint rs axisSorted State.initial) =
-      stratifiedFixpoint rs axisSorted State.initial) ∧
-    (∀ a, ∀ r ∈ rs.cat2 a,
-      r.apply (stratifiedFixpoint rs axisSorted State.initial) =
-      stratifiedFixpoint rs axisSorted State.initial)
+The "fixpoint after foldl" property of a list of NAF rules: after cat2Apply,
+applying any rule from the list has no effect. This is the key per-stratum
+stability fact for cat2 rules. -/
+
+/-- Helper: `cat2Apply` distributes over list concatenation. -/
+private theorem cat2Apply_append (rules1 rules2 : List (NafRule C A)) (s : State C A) :
+    cat2Apply (rules1 ++ rules2) s = cat2Apply rules2 (cat2Apply rules1 s) := by
+  unfold cat2Apply
+  rw [List.foldl_append]
+
+/-- Helper: a NAF rule preserves cells that are NOT (in the information ordering,
+NOT can't be downgraded). -/
+private theorem NafRule.preserves_not (r : NafRule C A) (s : State C A) (c : C) (a : A)
+    (h_not : s c a = .not) : (r.apply s) c a = .not := by
+  by_cases hxa : a = r.axis
+  · -- Same axis: only_adds_not preserves non-CAN.
+    rw [hxa] at h_not ⊢
+    by_contra h_ne
+    have h_change : (r.apply s) c r.axis ≠ s c r.axis :=
+      fun heq => h_ne (heq.trans h_not)
+    have := (r.only_adds_not s c h_change).1
+    rw [h_not] at this
+    exact MetaValue.noConfusion this
+  · -- Different axis: axis_local preserves.
+    rw [r.axis_local s c a hxa]; exact h_not
+
+/-- Helper: a NAF rule preserves cells that are IS. -/
+private theorem NafRule.preserves_is (r : NafRule C A) (s : State C A) (c : C) (a : A)
+    (h_is : s c a = .is) : (r.apply s) c a = .is := by
+  by_cases hxa : a = r.axis
+  · rw [hxa] at h_is ⊢
+    by_contra h_ne
+    have h_change : (r.apply s) c r.axis ≠ s c r.axis :=
+      fun heq => h_ne (heq.trans h_is)
+    have := (r.only_adds_not s c h_change).1
+    rw [h_is] at this
+    exact MetaValue.noConfusion this
+  · rw [r.axis_local s c a hxa]; exact h_is
+
+/-- Helper: cells that are NOT in the input remain NOT after `cat2Apply`. -/
+private theorem cat2Apply_preserves_not (rules : List (NafRule C A)) (s : State C A)
+    (c : C) (a : A) (h_not : s c a = .not) :
+    (cat2Apply rules s) c a = .not := by
+  induction rules generalizing s with
+  | nil => exact h_not
+  | cons r rest ih =>
+    simp only [cat2Apply, List.foldl]
+    exact ih (r.apply s) (r.preserves_not s c a h_not)
+
+/-- Helper: cells that are IS in the input remain IS after `cat2Apply`. -/
+private theorem cat2Apply_preserves_is (rules : List (NafRule C A)) (s : State C A)
+    (c : C) (a : A) (h_is : s c a = .is) :
+    (cat2Apply rules s) c a = .is := by
+  induction rules generalizing s with
+  | nil => exact h_is
+  | cons r rest ih =>
+    simp only [cat2Apply, List.foldl]
+    exact ih (r.apply s) (r.preserves_is s c a h_is)
+
+/-- Helper: `cat2Apply` doesn't reverse CAN→determined: if the result is CAN
+at some cell, the input was also CAN there. -/
+private theorem cat2Apply_can_back (rules : List (NafRule C A)) (s : State C A)
+    (c : C) (a : A) (h_can : (cat2Apply rules s) c a = .can) :
+    s c a = .can := by
+  cases h : s c a with
+  | can => rfl
+  | is =>
+    have := cat2Apply_preserves_is rules s c a h
+    rw [this] at h_can
+    exact MetaValue.noConfusion h_can
+  | not =>
+    have := cat2Apply_preserves_not rules s c a h
+    rw [this] at h_can
+    exact MetaValue.noConfusion h_can
+
+/-- A NAF rule with `axis ∉ read_axes` (no self-trigger-read) is idempotent.
+
+Two-step intuition: applying `r` once writes `.not` to CAN cells where
+the trigger fires. Applying again: those cells are `.not` (preserved by
+`only_adds_not`); the remaining CAN cells have the same trigger result
+as on `s` (read_axes don't include `axis`, so reads are frozen across
+the first `r.apply`; per-cell axis input is `.can` in both `s` and
+`r.apply s` for non-firing cells). So no new firings occur. -/
+private theorem NafRule.idempotent (r : NafRule C A) (s : State C A)
+    (h_no_self_read : r.axis ∉ r.read_axes) :
+    r.apply (r.apply s) = r.apply s := by
+  funext c x
+  by_cases hxa : x = r.axis
+  · rw [hxa]
+    by_cases h_can : (r.apply s) c r.axis = .can
+    · -- (r.apply s) c r.axis = .can. Want r.apply (r.apply s) c r.axis = .can.
+      -- s c r.axis = .can too: only_adds_not on s says either s c axis = (apply s) c axis,
+      -- or s c axis = .can ∧ apply s c axis = .not. Latter contradicts h_can.
+      have h_s_can : s c r.axis = .can := by
+        by_contra h_s_ne_can
+        have h_change : (r.apply s) c r.axis ≠ s c r.axis := by
+          rw [h_can]; intro heq; exact h_s_ne_can heq.symm
+        have h_pair := r.only_adds_not s c h_change
+        have h_apply_not : (r.apply s) c r.axis = .not := h_pair.2
+        rw [h_apply_not] at h_can
+        exact MetaValue.noConfusion h_can
+      have h_at_axis_eq : s c r.axis = (r.apply s) c r.axis := by
+        rw [h_s_can, h_can]
+      have h_read_eq : ∀ c' b, b ∈ r.read_axes → s c' b = (r.apply s) c' b := by
+        intro c' b hb
+        have hb_ne_axis : b ≠ r.axis := fun heq => h_no_self_read (heq ▸ hb)
+        exact (r.axis_local s c' b hb_ne_axis).symm
+      have h_frame :
+          r.apply s c r.axis = r.apply (r.apply s) c r.axis :=
+        r.frame_local s (r.apply s) h_read_eq c h_at_axis_eq
+      -- h_frame : r.apply s c r.axis = r.apply (r.apply s) c r.axis.
+      -- Combined with h_can : r.apply s c r.axis = .can.
+      rw [← h_frame, h_can]
+    · -- (r.apply s) c r.axis ≠ .can; only_adds_not preserves.
+      by_contra h_ne
+      exact h_can (r.only_adds_not (r.apply s) c h_ne).1
+  · rw [r.axis_local (r.apply s) c x hxa]
+
+/-- After `cat2Apply rules s`, every rule `r ∈ rules` is a fixpoint of the
+result, provided all rules share the same axis and are strictly stratified
+(read_axes don't include the axis itself).
+
+The intuition: each rule's firing decision depends only on `read_axes`
+(strict-lower-strata cells, frozen throughout `cat2Apply` since cat2 only
+modifies axis `a`) and on the per-cell axis input. If `(c, a)` is CAN
+post-`cat2Apply`, no rule fired on it during the foldl — and crucially,
+no rule's apply on the input would have produced NOT either. So
+re-applying any `r ∈ rules` to the post-cat2Apply state preserves CAN
+cells. The proof inducts on `rules`. -/
+private theorem cat2Apply_each_rule_fixes
+    (rules : List (NafRule C A)) (s : State C A) (a : A)
+    (h_axis : ∀ r ∈ rules, r.axis = a)
+    (h_no_self_read : ∀ r ∈ rules, a ∉ r.read_axes) :
+    ∀ r ∈ rules, r.apply (cat2Apply rules s) = cat2Apply rules s := by
+  induction rules generalizing s with
+  | nil => intro r hr; exact absurd hr (List.not_mem_nil)
+  | cons r' rest ih =>
+    intro r hr
+    have h_axis_rest : ∀ r ∈ rest, r.axis = a := fun r hr =>
+      h_axis r (List.mem_cons_of_mem r' hr)
+    have h_no_self_read_rest : ∀ r ∈ rest, a ∉ r.read_axes := fun r hr =>
+      h_no_self_read r (List.mem_cons_of_mem r' hr)
+    have hr'_axis : r'.axis = a := h_axis r' List.mem_cons_self
+    have hr'_no_self_read : a ∉ r'.read_axes := h_no_self_read r' List.mem_cons_self
+    have h_unfold : cat2Apply (r' :: rest) s = cat2Apply rest (r'.apply s) := by
+      simp [cat2Apply, List.foldl]
+    rw [h_unfold]
+    rcases List.mem_cons.mp hr with rfl | h_in_rest
+    · -- Case r = r' (after substitution, r is the same variable as r').
+      have h_idem : r.apply (r.apply s) = r.apply s := r.idempotent s
+        (by rw [hr'_axis]; exact hr'_no_self_read)
+      apply r.fixes_post_cat2 (r.apply s) (cat2Apply rest (r.apply s)) h_idem
+      · intro c' b hb
+        have hb_ne_a : b ≠ a := fun heq => hr'_no_self_read (heq ▸ hb)
+        exact (cat2Apply_axis_local rest a h_axis_rest (r.apply s) c' b hb_ne_a).symm
+      · intro c'
+        by_cases h : (r.apply s) c' r.axis = .can
+        · left; exact h
+        · right
+          rcases h_eq : (r.apply s) c' r.axis with _ | _ | _
+          · exact cat2Apply_preserves_is rest (r.apply s) c' r.axis h_eq
+          · exact cat2Apply_preserves_not rest (r.apply s) c' r.axis h_eq
+          · exact absurd h_eq h
+    · exact ih (r'.apply s) h_axis_rest h_no_self_read_rest r h_in_rest
 
 /-! ## Key Lemma: Monotone Composition on Finite Domains -/
 
@@ -962,6 +1183,155 @@ theorem composeMonotone_eq_self_of_each_fixed (rules : List (MonotoneRule C A))
     simp only [composeMonotone, List.foldl]
     rw [h_r]
     exact ih h_rest
+
+/-! ## Theorem 1.3: Stability
+
+The stratified fixpoint is a fixpoint of every cat1 and cat2 rule. The
+proof composes:
+
+1. Per-stratum cat1 fixpoint: at axis `a`'s processing time, every cat1
+   rule fixes the post-cat1 state (`composeMonotone_fixpoint_each_rule`
+   applied to `cat1Fixpoint_is_fixpoint`).
+
+2. Cat1 rules survive cat2 application via `MonotoneRule.fixes_post_cat1`
+   (read_axes are off-axis-a so cat2 doesn't change them; axis-a cells
+   are CAN→NOT or unchanged, satisfying the per-cell preservation).
+
+3. Cat1 rules survive the suffix fold via `MonotoneRule.fixes_post_cat1`
+   again (later strata only modify axes other than `a`; strict-lower-strata
+   are not in the suffix; axis a unchanged).
+
+4. Cat2 rules satisfy a parallel argument: `cat2Apply_each_rule_fixes`
+   establishes per-stratum stability after `cat2Apply`; then
+   `NafRule.fixes_post_cat2` lifts through the suffix.
+
+The proof requires `axisSorted.Nodup` (each axis appears at most once)
+and that `a` appears in `axisSorted`. -/
+
+/-- Helper: if `pre ++ a :: post` is a valid topo sort, every element of
+`post` has stratum `≥ strat a`. -/
+private theorem post_strat_ge_of_valid {strat : Stratification A}
+    {pre : List A} {a : A} {post : List A}
+    (h_valid : IsTopoSort strat (pre ++ a :: post)) :
+    ∀ b ∈ post, strat.strat a ≤ strat.strat b := by
+  intro b hb
+  have h_a_post_valid : IsTopoSort strat (a :: post) :=
+    h_valid.sublist (List.sublist_append_right pre (a :: post))
+  exact h_a_post_valid.head_strat_le b hb
+
+/-- **Theorem 1.3 (general): Stability.** Each cat1 and cat2 rule at an axis
+appearing in the topo sort is a fixpoint of the stratified fixpoint result. -/
+theorem stratified_fixpoint_stable_general
+    (rs : StratifiedRuleSet C A)
+    (axisSorted : List A)
+    (h_nodup : axisSorted.Nodup)
+    (h_valid : IsTopoSort rs.strat axisSorted)
+    (s₀ : State C A) :
+    (∀ a ∈ axisSorted, ∀ r ∈ rs.cat1 a,
+      r.apply (stratifiedFixpoint rs axisSorted s₀) =
+      stratifiedFixpoint rs axisSorted s₀) ∧
+    (∀ a ∈ axisSorted, ∀ r ∈ rs.cat2 a,
+      r.apply (stratifiedFixpoint rs axisSorted s₀) =
+      stratifiedFixpoint rs axisSorted s₀) := by
+  refine ⟨?_, ?_⟩
+  all_goals
+    intro a h_a_in r hr
+    obtain ⟨pre, post, h_split⟩ := List.append_of_mem h_a_in
+    have h_split_nodup : (pre ++ a :: post).Nodup := h_split ▸ h_nodup
+    have h_a_not_post : a ∉ post := by
+      have h := (List.nodup_append.mp h_split_nodup).2.1
+      exact (List.nodup_cons.mp h).1
+    have h_split_valid : IsTopoSort rs.strat (pre ++ a :: post) := h_split ▸ h_valid
+    have h_post_strat_ge : ∀ b ∈ post, rs.strat.strat a ≤ rs.strat.strat b :=
+      post_strat_ge_of_valid h_split_valid
+    set state_pre := pre.foldl (fun s a' => processStratum rs a' s) s₀ with hsp
+    set s_cat1 := cat1Fixpoint (rs.cat1 a) state_pre with hsc
+    set s_after_a := processStratum rs a state_pre with hsa
+    have hsa_eq : s_after_a = cat2Apply (rs.cat2 a) s_cat1 := rfl
+    have h_final_eq :
+        stratifiedFixpoint rs axisSorted s₀ =
+        post.foldl (fun s a' => processStratum rs a' s) s_after_a := by
+      show axisSorted.foldl _ s₀ = _
+      rw [h_split, List.foldl_append, List.foldl_cons]
+    rw [h_final_eq]
+    set t := post.foldl (fun s a' => processStratum rs a' s) s_after_a with ht
+    have h_t_read_eq_after_a : ∀ (read_axes : Finset A),
+        (∀ b ∈ read_axes, rs.strat.strat b < rs.strat.strat a) →
+        ∀ c b, b ∈ read_axes → s_after_a c b = t c b := by
+      intro read_axes h_strat c b hb
+      have hb_strat : rs.strat.strat b < rs.strat.strat a := h_strat b hb
+      have hb_not_in_post : b ∉ post := by
+        intro h
+        have := h_post_strat_ge b h
+        exact absurd (lt_of_lt_of_le hb_strat this) (lt_irrefl _)
+      exact (foldl_processStratum_preserves_off_list rs post s_after_a b
+        hb_not_in_post c).symm
+    have h_t_axis_a : ∀ c, t c a = s_after_a c a := by
+      intro c
+      exact foldl_processStratum_preserves_off_list rs post s_after_a a h_a_not_post c
+  · -- Cat1 case.
+    have hr_axis : r.axis = a := rs.cat1_axis a r hr
+    have hr_read_strict : ∀ b ∈ r.read_axes, rs.strat.strat b < rs.strat.strat a :=
+      rs.cat1_strat_consistent a r hr
+    have h_r_fixes_cat1 : r.apply s_cat1 = s_cat1 := by
+      have h_fp := cat1Fixpoint_is_fixpoint (rs.cat1 a) state_pre
+      exact composeMonotone_fixpoint_each_rule (rs.cat1 a) s_cat1 h_fp r hr
+    have h_r_fixes_after_a : r.apply s_after_a = s_after_a := by
+      apply r.fixes_post_cat1 s_cat1 s_after_a h_r_fixes_cat1
+      · intro c b hb
+        have hb_ne_a : b ≠ a := by
+          intro heq
+          have h_lt := hr_read_strict b hb
+          rw [heq] at h_lt
+          exact lt_irrefl _ h_lt
+        rw [hsa_eq]
+        exact (cat2Apply_axis_local (rs.cat2 a) a (rs.cat2_axis a) s_cat1 c b hb_ne_a).symm
+      · intro c
+        rw [hsa_eq, hr_axis]
+        rcases h_cat1_val : s_cat1 c a with _ | _ | _
+        · right
+          exact cat2Apply_preserves_is (rs.cat2 a) s_cat1 c a h_cat1_val
+        · right
+          exact cat2Apply_preserves_not (rs.cat2 a) s_cat1 c a h_cat1_val
+        · left; rfl
+    apply r.fixes_post_cat1 s_after_a t h_r_fixes_after_a
+    · exact h_t_read_eq_after_a r.read_axes hr_read_strict
+    · intro c
+      right
+      rw [hr_axis]
+      exact h_t_axis_a c
+  · -- Cat2 case (parallel).
+    have hr_axis : r.axis = a := rs.cat2_axis a r hr
+    have hr_read_strict : ∀ b ∈ r.read_axes, rs.strat.strat b < rs.strat.strat a :=
+      rs.cat2_strat_consistent a r hr
+    have h_no_self_read_all : ∀ r' ∈ rs.cat2 a, a ∉ r'.read_axes := by
+      intro r' hr' hb
+      have := rs.cat2_strat_consistent a r' hr' a hb
+      exact lt_irrefl _ this
+    have h_r_fixes_after_a : r.apply s_after_a = s_after_a := by
+      rw [hsa_eq]
+      exact cat2Apply_each_rule_fixes (rs.cat2 a) s_cat1 a (rs.cat2_axis a)
+        h_no_self_read_all r hr
+    apply r.fixes_post_cat2 s_after_a t h_r_fixes_after_a
+    · exact h_t_read_eq_after_a r.read_axes hr_read_strict
+    · intro c
+      right
+      rw [hr_axis]
+      exact h_t_axis_a c
+
+/-- **Theorem 1.3: Stability.** From `State.initial`. -/
+theorem stratified_fixpoint_stable
+    (rs : StratifiedRuleSet C A)
+    (axisSorted : List A)
+    (h_nodup : axisSorted.Nodup)
+    (h_valid : IsTopoSort rs.strat axisSorted) :
+    (∀ a ∈ axisSorted, ∀ r ∈ rs.cat1 a,
+      r.apply (stratifiedFixpoint rs axisSorted State.initial) =
+      stratifiedFixpoint rs axisSorted State.initial) ∧
+    (∀ a ∈ axisSorted, ∀ r ∈ rs.cat2 a,
+      r.apply (stratifiedFixpoint rs axisSorted State.initial) =
+      stratifiedFixpoint rs axisSorted State.initial) :=
+  stratified_fixpoint_stable_general rs axisSorted h_nodup h_valid State.initial
 
 /-! ## `cat1Fixpoint` extension under rule subset
 

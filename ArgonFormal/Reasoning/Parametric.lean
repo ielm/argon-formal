@@ -293,11 +293,14 @@ theorem parametric_fixpoint_unique (prs : ParametricRuleSet C A)
 No rule application (concrete or expanded parametric) changes the result.
 Follows from Theorem 1.3 applied to the expanded rule set. -/
 theorem parametric_fixpoint_stable (prs : ParametricRuleSet C A)
-    (axisSorted : List A) :
+    (axisSorted : List A)
+    (h_nodup : axisSorted.Nodup)
+    (h_valid : IsTopoSort prs.strat axisSorted) :
     let result := parametricFixpoint prs axisSorted State.initial
-    (∀ a, ∀ r ∈ prs.expand.cat1 a, r.apply result = result) ∧
-    (∀ a, ∀ r ∈ prs.expand.cat2 a, r.apply result = result) :=
-  stratified_fixpoint_stable prs.expand axisSorted
+    (∀ a ∈ axisSorted, ∀ r ∈ prs.expand.cat1 a, r.apply result = result) ∧
+    (∀ a ∈ axisSorted, ∀ r ∈ prs.expand.cat2 a, r.apply result = result) :=
+  stratified_fixpoint_stable prs.expand axisSorted h_nodup
+    (show IsTopoSort prs.expand.strat axisSorted from h_valid)
 
 /-! ## T_P.4: Lazy Expansion Equivalence -/
 
