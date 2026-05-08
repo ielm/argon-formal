@@ -36,22 +36,30 @@ variable {C A : Type} [DecidableEq C] [DecidableEq A] [Fintype C] [Fintype A]
 
 variable {C A : Type} [DecidableEq C] [DecidableEq A] in
 /-- The frame property for a rule's `apply` function: the value written on
-the rule's own `axis` depends only on cells at axes in `read_axes`.
+the rule's own `axis` at concept `c` depends only on (1) cells at axes in
+`read_axes` (the trigger axes — strictly lower strata) and (2) the
+input value at the same cell `(c, axis)`.
 
-The natural intuition is "apply is fully determined by read_axes," but
-that's incompatible with `axis_local` — cells outside `read_axes` and
-outside `axis` pass through unchanged from the input, so two inputs
-differing there produce two outputs differing there. The accurate
-read-locality condition is the *axis-restricted* one: the rule's WRITE
-on its own axis is a function of read_axes inputs.
+This is the natural read-locality condition for stratified Datalog
+rules:
+- `read_axes` excludes the rule's own `axis`. Cross-axis trigger reads
+  are confined to strictly-lower strata.
+- The own-axis dependency is per-cell: the rule's write at `(c, axis)`
+  depends on the input value at `(c, axis)` (so `only_adds_is` /
+  `only_adds_not` can fire conditionally on `.can`), but doesn't depend
+  on axis-`axis` values at *other* concepts `c'`.
 
-Combined with `axis_local` (the rule writes nothing else), this captures
-the full read/write boundary: outputs are read-determined on `axis` and
-input-passing-through everywhere else. -/
+Combined with `axis_local` (the rule writes nothing outside `axis`) and
+`only_adds_is` / `only_adds_not` (CAN-only writes), this captures the
+full read/write boundary: outputs are read-determined on `axis` and
+input-passing-through everywhere else. The strict form supports the
+post-cat2 / post-suffix preservation arguments needed for
+`stratified_fixpoint_stable`. -/
 def FrameLocal (read_axes : Finset A) (axis : A) (apply : State C A → State C A) : Prop :=
   ∀ s t : State C A,
     (∀ c : C, ∀ b : A, b ∈ read_axes → s c b = t c b) →
-    ∀ c : C, (apply s) c axis = (apply t) c axis
+    ∀ c : C, s c axis = t c axis →
+    (apply s) c axis = (apply t) c axis
 
 /-- A Category 1 (positive propagation) rule.
 Monotone: only adds IS values, never removes information.
@@ -118,16 +126,20 @@ structure ConstraintCheck (C A : Type) [DecidableEq C] [DecidableEq A]
 /-- A collection of rules organized by axis, respecting stratification.
 
 The stratification consistency invariants tie each rule's declared
-`read_axes` to the stratification. **Strict stratification** for both
-categories: a rule at axis `a` may read its own axis (rules read
-existing values on their own axis to check for `.can` or determined
-values), or any axis at a stratum strictly below `strat a`. Cross-axis
-reads to same-stratum axes are forbidden.
+`read_axes` (the trigger axes) to the stratification. **Strict
+stratification** for both categories: a rule at axis `a` may read
+trigger inputs only at axes strictly below `strat a`. Own-axis
+inspection happens per-cell via `only_adds_is` / `only_adds_not` and
+the per-cell `frame_local` formulation, not via `read_axes`.
 
-This is the form of stratification required by per-axis processing: when
-`processStratum` runs axis `a` then axis `b` (both at the same stratum),
-the result must be invariant under swapping. That requires `a`'s rules
-to not depend on `b`'s state and vice versa.
+This is the form of stratification required by per-axis processing:
+- When `processStratum` runs axis `a` then axis `b` at the same stratum,
+  the result must be invariant under swapping. Strict stratification
+  makes `a`'s rules independent of `b`'s state and vice versa.
+- For `stratified_fixpoint_stable`, cat1 rules at axis `a` must remain
+  fixpoints even after later stages (cat2 at axis `a`, then later
+  strata) modify the state. Strict stratification keeps the trigger
+  inputs frozen across these stages.
 
 For mutually-recursive same-stratum axes, the design move is either to
 combine them into one super-axis with a joint fixpoint, or to put them
@@ -135,9 +147,7 @@ at distinct strata. Argon's compiler enforces this at stratification
 time.
 
 These invariants are the structural conditions of stratified Datalog
-(Apt-Blair-Walker 1988). They make `processStratum_reads_independently`
-discharge-able for any pair of distinct same-stratum axes, which in turn
-gives `stratified_fixpoint_unique`. -/
+(Apt-Blair-Walker 1988). -/
 structure StratifiedRuleSet (C A : Type) [DecidableEq C] [DecidableEq A]
     [Fintype C] [Fintype A] where
   /-- The stratification of axes. -/
@@ -152,12 +162,12 @@ structure StratifiedRuleSet (C A : Type) [DecidableEq C] [DecidableEq A]
   cat1_axis : ∀ a, ∀ r ∈ cat1 a, r.axis = a
   /-- All Cat2 rules for axis `a` have `axis = a`. -/
   cat2_axis : ∀ a, ∀ r ∈ cat2 a, r.axis = a
-  /-- Cat1 rules at axis `a` only read own axis or strata `< strat a`. -/
+  /-- Cat1 rules at axis `a` have trigger reads strictly below `strat a`. -/
   cat1_strat_consistent : ∀ a, ∀ r ∈ cat1 a, ∀ b ∈ r.read_axes,
-    b = a ∨ strat.strat b < strat.strat a
-  /-- Cat2 rules at axis `a` only read own axis or strata `< strat a`. -/
+    strat.strat b < strat.strat a
+  /-- Cat2 rules at axis `a` have trigger reads strictly below `strat a`. -/
   cat2_strat_consistent : ∀ a, ∀ r ∈ cat2 a, ∀ b ∈ r.read_axes,
-    b = a ∨ strat.strat b < strat.strat a
+    strat.strat b < strat.strat a
 
 /-- Compose a list of monotone rules into a single state transformation.
 Apply each rule in sequence. -/

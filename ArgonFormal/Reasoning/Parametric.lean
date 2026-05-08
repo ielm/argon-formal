@@ -143,20 +143,20 @@ structure ParametricRuleSet (C A : Type) [DecidableEq C] [DecidableEq A] [Fintyp
   cat1_axis : ∀ a, ∀ r ∈ cat1 a, r.axis = a
   /-- Concrete Cat2 rules for axis `a` target axis `a`. -/
   cat2_axis : ∀ a, ∀ r ∈ cat2 a, r.axis = a
-  /-- Concrete Cat1 rules at axis `a` only read own axis or strata `< strat a`. -/
+  /-- Concrete Cat1 rules at axis `a` have trigger reads strictly below `strat a`. -/
   cat1_strat_consistent : ∀ a, ∀ r ∈ cat1 a, ∀ b ∈ r.read_axes,
-    b = a ∨ strat.strat b < strat.strat a
-  /-- Concrete Cat2 rules at axis `a` only read own axis or strata `< strat a`. -/
+    strat.strat b < strat.strat a
+  /-- Concrete Cat2 rules at axis `a` have trigger reads strictly below `strat a`. -/
   cat2_strat_consistent : ∀ a, ∀ r ∈ cat2 a, ∀ b ∈ r.read_axes,
-    b = a ∨ strat.strat b < strat.strat a
+    strat.strat b < strat.strat a
   /-- Parametric Cat1 rules: every instantiation respects stratification. -/
   pcat1_strat_consistent : ∀ pr ∈ pcat1, ∀ (a : A) (h : pr.bound a),
     ∀ b ∈ (pr.instantiate a h).read_axes,
-      b = a ∨ strat.strat b < strat.strat a
+      strat.strat b < strat.strat a
   /-- Parametric Cat2 rules: every instantiation respects stratification. -/
   pcat2_strat_consistent : ∀ pr ∈ pcat2, ∀ (a : A) (h : pr.bound a),
     ∀ b ∈ (pr.instantiate a h).read_axes,
-      b = a ∨ strat.strat b < strat.strat a
+      strat.strat b < strat.strat a
 
 /-! ## Expansion (Monomorphization) -/
 

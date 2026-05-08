@@ -203,13 +203,14 @@ theorem MonotoneRule.skips_of_axis_ne_and_not_read (r : MonotoneRule C A) (b : A
     OperatorSkips b r.apply := by
   intro s t h c x hxb
   by_cases hxa : x = r.axis
-  · -- Output on axis = read-determined, and s, t agree on read_axes (b ∉ read_axes).
+  · -- Output on axis = read-determined. Need: agree on read_axes + agree at (c, axis).
     rw [hxa]
     apply r.frame_local
-    intro c' b' hb'
-    -- b' ∈ read_axes, so b' ≠ b (since b ∉ read_axes). Then s c' b' = t c' b'.
-    have hb'_ne : b' ≠ b := fun heq => h_not_read (heq ▸ hb')
-    exact h c' b' hb'_ne
+    · intro c' b' hb'
+      have hb'_ne : b' ≠ b := fun heq => h_not_read (heq ▸ hb')
+      exact h c' b' hb'_ne
+    · -- Agree at (c, axis): axis ≠ b, so by hyp s c axis = t c axis.
+      exact h c r.axis h_axis_ne
   · -- Output off axis = input off axis (by axis_local).
     rw [r.axis_local s c x hxa, r.axis_local t c x hxa]
     exact h c x hxb
@@ -222,9 +223,10 @@ theorem NafRule.skips_of_axis_ne_and_not_read (r : NafRule C A) (b : A)
   by_cases hxa : x = r.axis
   · rw [hxa]
     apply r.frame_local
-    intro c' b' hb'
-    have hb'_ne : b' ≠ b := fun heq => h_not_read (heq ▸ hb')
-    exact h c' b' hb'_ne
+    · intro c' b' hb'
+      have hb'_ne : b' ≠ b := fun heq => h_not_read (heq ▸ hb')
+      exact h c' b' hb'_ne
+    · exact h c r.axis h_axis_ne
   · rw [r.axis_local s c x hxa, r.axis_local t c x hxa]
     exact h c x hxb
 
@@ -321,13 +323,11 @@ theorem processStratum_skips_of_strat_le
     OperatorSkips b (processStratum rs a) := by
   apply processStratum_skips rs a b h_ne
   · intro r hr h_b_in
-    rcases rs.cat1_strat_consistent a r hr b h_b_in with h_eq | h_lt
-    · exact h_ne h_eq.symm
-    · exact absurd (lt_of_lt_of_le h_lt h_strat_le) (lt_irrefl _)
+    have h_lt := rs.cat1_strat_consistent a r hr b h_b_in
+    exact absurd (lt_of_lt_of_le h_lt h_strat_le) (lt_irrefl _)
   · intro r hr h_b_in
-    rcases rs.cat2_strat_consistent a r hr b h_b_in with h_eq | h_lt
-    · exact h_ne h_eq.symm
-    · exact absurd (lt_of_lt_of_le h_lt h_strat_le) (lt_irrefl _)
+    have h_lt := rs.cat2_strat_consistent a r hr b h_b_in
+    exact absurd (lt_of_lt_of_le h_lt h_strat_le) (lt_irrefl _)
 
 /-! ## `processStratum` for read-independent axes commute
 
