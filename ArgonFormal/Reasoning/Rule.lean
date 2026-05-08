@@ -110,15 +110,24 @@ structure ConstraintCheck (C A : Type) [DecidableEq C] [DecidableEq A]
 /-- A collection of rules organized by axis, respecting stratification.
 
 The stratification consistency invariants tie each rule's declared
-`read_axes` to the stratification:
-- Cat1 rules at axis `a` may read any axis at stratum `≤ strat a`
-  (including own axis at the same stratum).
-- Cat2 rules at axis `a` may read own axis (for the `.can` check) and any
-  axis at stratum strictly below `strat a`. NAF over same-stratum axes
-  would be ill-stratified.
+`read_axes` to the stratification. **Strict stratification** for both
+categories: a rule at axis `a` may read its own axis (rules read
+existing values on their own axis to check for `.can` or determined
+values), or any axis at a stratum strictly below `strat a`. Cross-axis
+reads to same-stratum axes are forbidden.
 
-These invariants are exactly the structural conditions of stratified
-Datalog (Apt-Blair-Walker 1988). They make `processStratum_commute`
+This is the form of stratification required by per-axis processing: when
+`processStratum` runs axis `a` then axis `b` (both at the same stratum),
+the result must be invariant under swapping. That requires `a`'s rules
+to not depend on `b`'s state and vice versa.
+
+For mutually-recursive same-stratum axes, the design move is either to
+combine them into one super-axis with a joint fixpoint, or to put them
+at distinct strata. Argon's compiler enforces this at stratification
+time.
+
+These invariants are the structural conditions of stratified Datalog
+(Apt-Blair-Walker 1988). They make `processStratum_reads_independently`
 discharge-able for any pair of distinct same-stratum axes, which in turn
 gives `stratified_fixpoint_unique`. -/
 structure StratifiedRuleSet (C A : Type) [DecidableEq C] [DecidableEq A]
@@ -135,10 +144,10 @@ structure StratifiedRuleSet (C A : Type) [DecidableEq C] [DecidableEq A]
   cat1_axis : ∀ a, ∀ r ∈ cat1 a, r.axis = a
   /-- All Cat2 rules for axis `a` have `axis = a`. -/
   cat2_axis : ∀ a, ∀ r ∈ cat2 a, r.axis = a
-  /-- Cat1 rules at axis `a` only read axes at strata `≤ strat a`. -/
+  /-- Cat1 rules at axis `a` only read own axis or strata `< strat a`. -/
   cat1_strat_consistent : ∀ a, ∀ r ∈ cat1 a, ∀ b ∈ r.read_axes,
-    strat.strat b ≤ strat.strat a
-  /-- Cat2 rules at axis `a` only read own axis or axes at strata `< strat a`. -/
+    b = a ∨ strat.strat b < strat.strat a
+  /-- Cat2 rules at axis `a` only read own axis or strata `< strat a`. -/
   cat2_strat_consistent : ∀ a, ∀ r ∈ cat2 a, ∀ b ∈ r.read_axes,
     b = a ∨ strat.strat b < strat.strat a
 
