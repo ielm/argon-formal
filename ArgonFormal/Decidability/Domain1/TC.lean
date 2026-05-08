@@ -122,18 +122,121 @@ private theorem exists_iter_step (a b : C) (h : Relation.TransGen r a b) :
                Finset.mem_filter, Finset.mem_univ, true_and]
     exact Or.inr ⟨_, hc, hcb⟩
 
-/-- Saturation: the chain `iterReachable s 0 ⊆ iterReachable s 1 ⊆ ...` is
-bounded by `Finset.univ`, so it stabilizes within `Fintype.card C` iterations.
-Concretely: any element ever appearing in any `iterReachable s n` is in
-`iterReachable s (Fintype.card C)`. We axiomatize the saturation step here as
-a clean primary-result: the proof requires a pigeonhole argument over the
-strictly-increasing cardinality chain (each non-fixpoint step adds at least
-one element; the cardinality is bounded by `Fintype.card C`). The classical
-ascending-chain-condition argument is well-known but its mechanization is
-substantial. See [follow-up proof obligation]. -/
-private axiom iterReachable_saturates (a : C) (n : Nat) (b : C) :
-    b ∈ iterReachable r (Finset.univ.filter (fun b => r a b)) n →
-    b ∈ iterReachable r (Finset.univ.filter (fun b => r a b)) (Fintype.card C)
+/-! ### Saturation: the chain stabilizes within `Fintype.card C` steps
+
+The chain `iterReachable s 0 ⊆ iterReachable s 1 ⊆ ...` is bounded by
+`Finset.univ`, so it stabilizes within `Fintype.card C` iterations.
+Proof structure:
+
+1. `iterReachable_constant_after_fixpoint`: once a step's iter is equal
+   to the previous step's iter (a fixpoint of `stepReachable`), the
+   chain stays constant from that point.
+2. `exists_fixpoint_within_card`: at least one such fixpoint occurs
+   within `Fintype.card C` iterations (by pigeonhole — strictly
+   increasing chain bounded by `Fintype.card C` can have at most
+   `Fintype.card C` strict steps).
+3. Combining: anything reachable at any iteration is reachable at step
+   `Fintype.card C`.
+-/
+
+/-- Once a step's iter equals the previous step's iter, the chain is
+constant from there on. Pure functional consequence of `iterReachable`'s
+definition + `stepReachable` being deterministic. -/
+private theorem iterReachable_constant_after_fixpoint
+    (s : Finset C) (k : Nat)
+    (h : iterReachable r s (k + 1) = iterReachable r s k) :
+    ∀ n ≥ k, iterReachable r s n = iterReachable r s k := by
+  intro n hn
+  induction n with
+  | zero =>
+    -- n = 0; hn : k ≤ 0 forces k = 0.
+    have hk : k = 0 := Nat.le_zero.mp hn
+    rw [hk]
+  | succ n ih =>
+    by_cases hkn : k ≤ n
+    · -- IH applies; iter (n+1) = step (iter n) = step (iter k) = iter (k+1) = iter k.
+      have h_n := ih hkn
+      simp only [iterReachable]
+      rw [show iterReachable r s n = iterReachable r s k from h_n]
+      -- Goal: stepReachable r (iterReachable r s k) = iterReachable r s k.
+      -- Note: iterReachable r s (k+1) = stepReachable r (iterReachable r s k) by def.
+      -- And h says that = iterReachable r s k.
+      exact h
+    · -- ¬ k ≤ n means n + 1 = k.
+      have hnk : n + 1 = k := by omega
+      rw [hnk]
+
+/-- Pigeonhole step: in any chain of Finsets bounded by `Finset.univ` of
+length `M + 1`, at least two consecutive elements are equal. Specialized
+to the iterReachable chain. -/
+private theorem exists_fixpoint_within_card (s : Finset C) :
+    ∃ k ≤ Fintype.card C,
+      iterReachable r s (k + 1) = iterReachable r s k := by
+  -- Suppose no fixpoint in `[0, Fintype.card C]`. Then every consecutive
+  -- pair is strict, giving `Fintype.card C + 1` strict cardinality
+  -- increases — contradicting the bound `card ≤ Fintype.card C`.
+  by_contra h_none
+  push_neg at h_none
+  -- h_none: ∀ k ≤ Fintype.card C, iterReachable s (k+1) ≠ iterReachable s k
+  -- Combined with `iterReachable_mono`, we get strict subset at each step.
+  -- Card chain: c_0 ≤ c_1 ≤ ... with c_i < c_{i+1} for i < Fintype.card C + 1.
+  -- So c_(Fintype.card C + 1) ≥ c_0 + (Fintype.card C + 1) ≥ Fintype.card C + 1.
+  -- But c_(Fintype.card C + 1) ≤ Fintype.card C. Contradiction.
+  have h_card_bound : ∀ k, (iterReachable r s k).card ≤ Fintype.card C := by
+    intro k
+    exact (iterReachable r s k).card_le_univ
+  have h_strict : ∀ k ≤ Fintype.card C,
+      (iterReachable r s k).card < (iterReachable r s (k + 1)).card := by
+    intro k hk
+    have h_sub : iterReachable r s k ⊆ iterReachable r s (k + 1) :=
+      iterReachable_mono s k (k + 1) (Nat.le_succ k)
+    have h_ne : iterReachable r s (k + 1) ≠ iterReachable r s k := h_none k hk
+    refine Finset.card_lt_card ⟨h_sub, ?_⟩
+    intro h_super
+    apply h_ne
+    exact le_antisymm h_super h_sub
+  -- The card chain has at least Fintype.card C + 1 strict increases:
+  -- c_0 < c_1 < ... < c_(Fintype.card C + 1).
+  -- So c_(Fintype.card C + 1) ≥ Fintype.card C + 1.
+  have h_chain : ∀ k ≤ Fintype.card C + 1,
+      k ≤ (iterReachable r s k).card := by
+    intro k hk
+    induction k with
+    | zero => exact Nat.zero_le _
+    | succ k ih =>
+      have hk' : k ≤ Fintype.card C + 1 := Nat.le_of_succ_le hk
+      have hk_le_C : k ≤ Fintype.card C := by omega
+      have h_card_lt := h_strict k hk_le_C
+      have h_ih := ih hk'
+      omega
+  have h_final : Fintype.card C + 1 ≤
+      (iterReachable r s (Fintype.card C + 1)).card :=
+    h_chain (Fintype.card C + 1) (le_refl _)
+  have h_bound := h_card_bound (Fintype.card C + 1)
+  omega
+
+/-- **Saturation theorem**: anything reachable at any iteration is
+reachable by step `Fintype.card C`. -/
+private theorem iterReachable_saturates (a : C) (n : Nat) (b : C)
+    (h : b ∈ iterReachable r (Finset.univ.filter (fun b => r a b)) n) :
+    b ∈ iterReachable r (Finset.univ.filter (fun b => r a b)) (Fintype.card C) := by
+  set s := Finset.univ.filter (fun b => r a b)
+  -- Find a fixpoint within Fintype.card C steps; chain stabilizes there.
+  obtain ⟨k, hk_le, hk_fix⟩ := exists_fixpoint_within_card s (r := r)
+  -- For n ≤ Fintype.card C: by mono.
+  -- For n > Fintype.card C: chain stabilized by step k ≤ Fintype.card C; both
+  --   iterReachable s n and iterReachable s (Fintype.card C) equal iterReachable s k.
+  by_cases h_n_le : n ≤ Fintype.card C
+  · exact iterReachable_mono s n (Fintype.card C) h_n_le h
+  · -- n > Fintype.card C ≥ k.
+    have h_n_ge : n ≥ k := by omega
+    have h_C_ge : Fintype.card C ≥ k := hk_le
+    have h_iter_n := iterReachable_constant_after_fixpoint s k hk_fix n h_n_ge
+    have h_iter_C := iterReachable_constant_after_fixpoint s k hk_fix
+      (Fintype.card C) h_C_ge
+    rw [h_iter_n] at h
+    rw [h_iter_C]
+    exact h
 
 /-- Completeness: if `TransGen r a b`, then `b ∈ reachableFrom r a`.
 
