@@ -56,7 +56,7 @@ Rules, fixpoints, and the stratified-Datalog-style operators that drive the meta
 - `State.lean` — assignment state `C → A → MetaValue`, pointwise information ordering, single-position `refine` update.
 - `Stratification.lean` — topological ordering of axes by dependency.
 - `Rule.lean` — `MonotoneRule` (Cat 1, positive propagation), `NafRule` (Cat 2, negation-as-failure), `ConstraintCheck` (Cat 3), `StratifiedRuleSet`. Composition + bounded fixpoint iteration helpers.
-- `Fixpoint.lean` — `cat1Fixpoint`, `cat2Apply`, `processStratum`, `stratifiedFixpoint`. Theorem 1.1 (termination); Theorem 1.2 (uniqueness — axiomatized, classical); Theorem 1.3 (stability — axiomatized, classical); least-fixpoint uniqueness; `monotone_inflationary_fixpoint_finite` (proved); `cat1Fixpoint_is_fixpoint` (proved); axis-locality and commutation lemmas; rule-set extension monotonicity (proved).
+- `Fixpoint.lean` — `cat1Fixpoint`, `cat2Apply`, `processStratum`, `stratifiedFixpoint`. Theorem 1.1 (termination), Theorem 1.2 (uniqueness), Theorem 1.3 (stability) — all proved as theorems. Includes `monotone_inflationary_fixpoint_finite`, `cat1Fixpoint_is_fixpoint`, axis-locality and commutation lemmas, the `foldl_processStratum_bubble` swap primitive, rule-set extension monotonicity, and the structural frame propagation (`OperatorSkips`, `processStratum_skips_of_strat_le`).
 - `Stability.lean` — Theorem 5: CAN-stability. `extension_monotone` (proved, via cat2 sublist-monotonicity).
 - `Composition.lean` — Theorem 4: package composition preserves convergence.
 - `Necessity.lean` — Theorem 2: acyclicity is necessary for the fixpoint.
@@ -143,7 +143,13 @@ Future RFDs land as new top-level subdirectories or files within existing areas:
 
 ## Axioms used
 
-Eight axioms total. Run `#print axioms <theorem>` from any downstream theorem to inspect what it actually depends on.
+Six axioms total — all external mathematical facts. Zero Argon-specific
+axioms; every theorem about the stratified fixpoint computation, package
+composition, narrowing soundness, and parametric expansion depends only
+on Lean's foundational axioms (`propext`, `Classical.choice`, `Quot.sound`).
+
+Run `#print axioms <theorem>` from any downstream theorem to inspect
+what it actually depends on.
 
 ### External mathematical facts (6 axioms)
 
@@ -152,15 +158,44 @@ Results from external systems / well-known classical theorems we depend on but d
 - `Decidability/Domain2/Theories.lean` — `d2Sat`, `qfliaDecidable`, `gnfoDecidable`, `d2CombinedDecidable` (4 axioms): the satisfaction relation for Domain 2 predicates and the decidability witnesses for QF-LIA and GNFO fragments. Decidability is classical: Ginsburg-Spanier 1966 for QF-LIA; Bárány-ten Cate-Segoufin 2015 for GNFO.
 - `Decidability/Complexity/Bounds.lean` — `qfliaNP`, `gnfo2ExpTime` (2 axioms): complexity classifications cited from primary sources.
 
-### Argon proof obligations (2 axioms)
+### Closed Argon obligations
 
-Classical results we're confident hold but whose Lean mechanizations require introducing a read-locality structural invariant on rules. Each carries a full proof outline in its docstring.
+All Argon-specific proof obligations are closed as theorems with full
+mechanical proofs:
 
 - `Reasoning/Fixpoint.lean`:
-  - `stratified_fixpoint_unique` — topo-sort independence of the fixpoint (Apt-Blair-Walker 1988). Requires a purely combinatorial topo-sort swap chain plus read-locality between same-stratum axes for `processStratum_commute`.
-  - `stratified_fixpoint_stable` — fixpoint witness (Knaster-Tarski applied per stratum). Requires read-locality so cat1 rules don't re-fire after cat2 adds NOT values, and so cat2 rule firing is determined by strictly-lower strata that don't change later.
+  - `monotone_inflationary_fixpoint_finite` — Knaster-Tarski on the IS/CAN/NOT
+    finite poset via the `numCan` ascending-chain measure.
+  - `cat1Fixpoint_is_fixpoint` — `cat1Fixpoint` reaches a true fixpoint of
+    `composeMonotone`.
+  - `processStratum_only_modifies_axis`, `processStratum_commute`,
+    `processStratum_skips_of_strat_le` — write- and read-locality via
+    `axis_local` + `frame_local` + strict stratification consistency.
+  - `foldl_processStratum_bubble` — the swap primitive for uniqueness:
+    bubbles an axis to the front of an equal-stratum prefix.
+  - `stratified_fixpoint_unique` — topo-sort independence (Apt-Blair-Walker
+    1988); inducts on `sort1`, locating each head in `sort2` via
+    `List.append_of_mem` and bubbling.
+  - `stratified_fixpoint_stable` — every cat1/cat2 rule is a fixpoint of
+    the final result; composes per-stratum cat1/cat2 fixpoint properties
+    with frame-local preservation through the suffix fold.
+- `Reasoning/Stability.lean` — `extension_monotone`: rule-set extension
+  produces ≥ fixpoint (cat2 hypothesis is `List.Sublist` rather than
+  set inclusion; NAF rules are order-dependent in general).
+- `Decidability/Domain1/TC.lean` — `iterReachable_saturates`: bounded-
+  reachability saturation by `Fintype.card C` iterations.
 
-The infrastructure for closing both is in place: `processStratum_only_modifies_axis`, `processStratum_commute` (under explicit read-independence), `composeMonotone_fixpoint_each_rule`, and the various per-component axis-locality lemmas. The remaining work is (a) the combinatorial topo-sort swap argument, and (b) introducing read-locality as a structural field on `MonotoneRule` / `NafRule` (or as a side condition on `StratifiedRuleSet`).
+### Structural model
+
+The closure rests on a structural read-locality model added to rule
+types: `MonotoneRule` and `NafRule` carry an explicit `read_axes : Finset A`
+field for trigger axes plus a `frame_local` per-cell witness; the
+`StratifiedRuleSet` carries `cat{1,2}_strat_consistent` invariants tying
+each rule's read-set to the stratification (strict — cat1 and cat2
+trigger reads are strictly below the rule's target stratum). This is
+the structural form of stratified Datalog (Apt-Blair-Walker 1988); it
+matches the trigger-pattern shape of Argon source rules and keeps
+runtime invariants checkable on rule-set load.
 
 ## License
 
