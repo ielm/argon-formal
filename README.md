@@ -147,14 +147,14 @@ Eleven axioms total. Run `#print axioms <theorem>` from any downstream theorem t
 
 ### External mathematical facts (7 axioms)
 
-These formalize results from external systems / well-known classical theorems we depend on but don't reprove. Pre-existing in the source repos before consolidation.
+Results from external systems / well-known classical theorems we depend on but don't reprove.
 
 - `Decidability/Domain2/Theories.lean` — `d2Sat`, `qfliaDecidable`, `gnfoDecidable`, `d2CombinedDecidable` (4 axioms): the satisfaction relation for Domain 2 predicates and the decidability witnesses for QF-LIA and GNFO fragments. Decidability is classical: Ginsburg-Spanier 1966 for QF-LIA; Bárány-ten Cate-Segoufin 2015 for GNFO.
 - `Decidability/Complexity/Bounds.lean` — `qfliaNP`, `gnfo2ExpTime` (2 axioms): complexity classifications cited from primary sources.
 
-### Argon proof obligations awaiting full mechanization (4 axioms)
+### Argon proof obligations (4 axioms)
 
-Added 2026-05-08 during workspace consolidation. Classical results we're confident hold but whose Lean mechanizations are substantial future proof work. Each carries a full proof outline in its docstring.
+Classical results we're confident hold but whose Lean mechanizations are substantial proof work. Each carries a full proof outline in its docstring.
 
 - `Reasoning/Fixpoint.lean`:
   - `stratified_fixpoint_unique` — topo-sort independence of the fixpoint (Apt-Blair-Walker 1988).
@@ -163,20 +163,7 @@ Added 2026-05-08 during workspace consolidation. Classical results we're confide
 - `Reasoning/Stability.lean` — `extension_monotone`: rule-set extension produces ≥ fixpoint.
 - `Decidability/Domain1/TC.lean` — `iterReachable_saturates`: bounded-reachability saturation by `Fintype.card C` iterations.
 
-The "Argon proof obligations" axioms are tracked as future proof work; the mathematical content is settled.
-
-## History
-
-Consolidated 2026-05-08 from four separate organically-grown repos into the single-library + seven-area structure:
-
-- `~/Code/meta-property-fixpoint` → `Foundation/MetaValue.lean` + `Reasoning/{State, Stratification, Rule, Fixpoint, Stability, Composition, Necessity, Parametric, Diagnostics}.lean`
-- `~/Code/flow-typing-soundness` → `Foundation/{Truth4, LatticeContext, Projection}.lean` + `TypeSystem/{NarrowPred, NarrowEnv, Judgment, Monotonicity}.lean` + `TypeSystem/Soundness/*` + `Standpoint/*`
-- `~/Code/ontolog-decidability` → `Schema/TypeGraph.lean` + `Decidability/*` (with the `OntologDecidability` namespace renamed to `ArgonDecidability` … actually folded into `ArgonFormal.Decidability` here; the language was briefly named Ontolog before settling on Argon).
-- `~/Code/cwa-locality` → `Schema/{Signature, Ontology, WorldAssumption}.lean` + `Locality/*`
-
-Duplicate definitions across the original repos (notably `MetaValue` shared between `meta-property-fixpoint` and `ontolog-decidability`, and `Stratification` clashing between `meta-property-fixpoint`'s structure and `cwa-locality`'s type alias) were resolved by extracting shared types to `Foundation/` / `Reasoning/` and renaming the locality-specific `Stratification` to `StratumIndex` in `Locality/ChainedCwa.lean`.
-
-The four origin repos remain on disk as historical artifacts; their git history is preserved and can be archived at convenience.
+These are tracked as proof obligations; the mathematical content is settled.
 
 ## License
 

@@ -1,0 +1,11 @@
+# Lake build artifacts
+.lake/build/
+.lake/packages/
+
+# Lake state
+.lake/lakefile.olean
+.lake/lakefile.olean.hash
+.lake/lakefile.trace
+
+# macOS
+.DS_Store

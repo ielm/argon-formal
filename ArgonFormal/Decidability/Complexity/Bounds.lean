@@ -97,7 +97,7 @@ axiom gnfo2ExpTime : ComplexityClass.exptime2 = .exptime2
 
 /-- **Theorem 4: Full Fragment Complexity.**
 
-The full Ontolog refinement predicate fragment is in 2-EXPTIME,
+The full Argon refinement predicate fragment is in 2-EXPTIME,
 dominated by the GNFO component. Domain 1 (PTime) and QF-LIA (NP)
 do not increase the bound — 2-EXPTIME subsumes both.
 

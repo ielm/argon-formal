@@ -44,7 +44,7 @@ axiom gnfoDecidable : ∀ (φ : D2Pred), φ = .gnfo → Decidable (d2Sat φ)
 /-- **Combined fragment decidability.**
     The combination QF-LIA + GNFO + finite enumeration equality is decidable.
 
-    Justification: The Ontolog fragment reduces to EPR + QF-LIA, which is
+    Justification: Argon's Domain 2 fragment reduces to EPR + QF-LIA, which is
     decidable via MBQI (Ge & de Moura, "Complete Instantiation for Quantified
     Formulas in SMT", 2009). GNFO constraints over the finite type graph
     reduce to EPR because the type graph is finite.
