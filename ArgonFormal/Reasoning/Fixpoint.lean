@@ -231,3 +231,43 @@ theorem monotone_inflationary_lfp_unique
       s₁ = s₂ := by
   intro s₁ s₂ hfp1 hfp2 hleast1 hleast2
   exact le_antisymm (hleast1 s₂ hfp2) (hleast2 s₁ hfp1)
+
+/-- Iteration preserves the "below `s'`" invariant when `s'` is a
+fixpoint of `f` and `f` is monotone. Direct induction on `n`: starting
+below `s'`, each step `f` keeps us below `s'` because `f` is monotone
+and `s' = f s'`. -/
+private theorem iterate_le_fixpoint_above
+    (f : State C A → State C A)
+    (hmono : ∀ s t : State C A, s ≤ t → f s ≤ f t)
+    (s s' : State C A)
+    (h_le : s ≤ s') (h_fp' : f s' = s') (n : Nat) :
+    Nat.iterate f n s ≤ s' := by
+  induction n with
+  | zero => exact h_le
+  | succ n ih =>
+    rw [Function.iterate_succ_apply']
+    -- f (Nat.iterate f n s) ≤ f s' = s'
+    calc f (Nat.iterate f n s)
+        ≤ f s' := hmono _ _ ih
+      _ = s' := h_fp'
+
+/-- **Iterate yields the least fixpoint.**
+
+Starting from `s` and iterating a monotone-inflationary operator any
+number of times keeps the result below every fixpoint above `s`. So if
+the iteration reaches its own fixpoint, that fixpoint is the least
+fixpoint above `s`.
+
+This is the load-bearing lemma for `extension_monotone`: if
+`F₁ = cat1Fixpoint rs₁ s` and `F₂ = cat1Fixpoint rs₂ s` and `rs₁ ⊆ rs₂`,
+then `F₂` is *also* a fixpoint of `composeMonotone rs₁` above `s` (a
+fact proved separately), and this lemma then gives `F₁ ≤ F₂`. -/
+theorem iterate_le_of_fixpoint_above
+    (f : State C A → State C A)
+    (hmono : ∀ s t : State C A, s ≤ t → f s ≤ f t)
+    (s : State C A) (n : Nat) (result : State C A)
+    (h_iter : Nat.iterate f n s = result) :
+    ∀ s', s ≤ s' → f s' = s' → result ≤ s' := by
+  intro s' h_le h_fp'
+  rw [← h_iter]
+  exact iterate_le_fixpoint_above f hmono s s' h_le h_fp' n
