@@ -175,31 +175,175 @@ theorem processStratum_only_modifies_axis (rs : StratifiedRuleSet C A) (a : A)
   rw [cat2Apply_axis_local (rs.cat2 a) a (rs.cat2_axis a) _ c a' hne]
   rw [cat1Fixpoint_axis_local (rs.cat1 a) a (rs.cat1_axis a) _ c a' hne]
 
+/-! ## Frame propagation: operators that "skip" an axis
+
+An operator `op : State → State` *skips axis `b`* if applying it to two
+states that agree everywhere except on axis-`b`'s column produces two
+states that still agree everywhere except on axis-`b`'s column. This is
+the natural "frame" property at the operator level.
+
+A rule at axis `a` skips axis `b` when (i) `a ≠ b` (so axis_local doesn't
+touch `b`) and (ii) `b ∉ read_axes` (so frame_local's read-determined
+write on axis `a` doesn't depend on `b`'s column). The two rule
+properties combine to give skip-`b`.
+
+Skip-`b` lifts through `List.foldl` and `Nat.iterate`, so `composeMonotone`,
+`cat1Fixpoint`, `cat2Apply`, and `processStratum` all skip `b` whenever
+their constituent rules do. -/
+
+/-- An operator skips axis `b`: input agreement off axis-`b` propagates to
+output agreement off axis-`b`. -/
+def OperatorSkips (b : A) (op : State C A → State C A) : Prop :=
+  ∀ s t : State C A, (∀ c x, x ≠ b → s c x = t c x) →
+    ∀ c x, x ≠ b → (op s) c x = (op t) c x
+
+/-- A monotone rule skips axis `b` when its `axis ≠ b` and `b ∉ read_axes`. -/
+theorem MonotoneRule.skips_of_axis_ne_and_not_read (r : MonotoneRule C A) (b : A)
+    (h_axis_ne : r.axis ≠ b) (h_not_read : b ∉ r.read_axes) :
+    OperatorSkips b r.apply := by
+  intro s t h c x hxb
+  by_cases hxa : x = r.axis
+  · -- Output on axis = read-determined, and s, t agree on read_axes (b ∉ read_axes).
+    rw [hxa]
+    apply r.frame_local
+    intro c' b' hb'
+    -- b' ∈ read_axes, so b' ≠ b (since b ∉ read_axes). Then s c' b' = t c' b'.
+    have hb'_ne : b' ≠ b := fun heq => h_not_read (heq ▸ hb')
+    exact h c' b' hb'_ne
+  · -- Output off axis = input off axis (by axis_local).
+    rw [r.axis_local s c x hxa, r.axis_local t c x hxa]
+    exact h c x hxb
+
+/-- A NAF rule skips axis `b` when its `axis ≠ b` and `b ∉ read_axes`. -/
+theorem NafRule.skips_of_axis_ne_and_not_read (r : NafRule C A) (b : A)
+    (h_axis_ne : r.axis ≠ b) (h_not_read : b ∉ r.read_axes) :
+    OperatorSkips b r.apply := by
+  intro s t h c x hxb
+  by_cases hxa : x = r.axis
+  · rw [hxa]
+    apply r.frame_local
+    intro c' b' hb'
+    have hb'_ne : b' ≠ b := fun heq => h_not_read (heq ▸ hb')
+    exact h c' b' hb'_ne
+  · rw [r.axis_local s c x hxa, r.axis_local t c x hxa]
+    exact h c x hxb
+
+/-- `OperatorSkips b` is preserved by composing two operators. -/
+theorem OperatorSkips.comp {b : A} {f g : State C A → State C A}
+    (hf : OperatorSkips b f) (hg : OperatorSkips b g) :
+    OperatorSkips b (g ∘ f) := by
+  intro s t h c x hxb
+  exact hg (f s) (f t) (fun c' x' hx' => hf s t h c' x' hx') c x hxb
+
+/-- Folding a list of skip-`b` operators preserves skip-`b`. -/
+theorem foldl_skips {β : Type*} (b : A) (l : List β)
+    (f : State C A → β → State C A)
+    (h_step : ∀ x ∈ l, OperatorSkips b (fun s => f s x)) :
+    OperatorSkips b (fun s => l.foldl f s) := by
+  induction l with
+  | nil => intro s t h c x hxb; exact h c x hxb
+  | cons y rest ih =>
+    intro s t h c x hxb
+    simp only [List.foldl]
+    have h_y : OperatorSkips b (fun s => f s y) := h_step y List.mem_cons_self
+    have h_rest : ∀ z ∈ rest, OperatorSkips b (fun s => f s z) :=
+      fun z hz => h_step z (List.mem_cons_of_mem y hz)
+    have h_after_y : ∀ c' x', x' ≠ b → (f s y) c' x' = (f t y) c' x' := h_y s t h
+    exact ih h_rest (f s y) (f t y) h_after_y c x hxb
+
+/-- Iterating a skip-`b` operator preserves skip-`b`. -/
+theorem iterate_skips (b : A) (op : State C A → State C A)
+    (h_op : OperatorSkips b op) (n : Nat) :
+    OperatorSkips b (Nat.iterate op n) := by
+  induction n with
+  | zero => intro s t h c x hxb; exact h c x hxb
+  | succ n ih =>
+    intro s t h c x hxb
+    rw [Function.iterate_succ_apply, Function.iterate_succ_apply]
+    exact ih (op s) (op t) (fun c' x' hx' => h_op s t h c' x' hx') c x hxb
+
+/-- `composeMonotone` of cat1 rules skips `b` if every rule skips `b`. -/
+theorem composeMonotone_skips (rules : List (MonotoneRule C A)) (b : A)
+    (h : ∀ r ∈ rules, OperatorSkips b r.apply) :
+    OperatorSkips b (composeMonotone rules) := by
+  unfold composeMonotone
+  exact foldl_skips b rules (fun acc r => r.apply acc) h
+
+/-- `cat1Fixpoint` skips `b` if every cat1 rule skips `b`. -/
+theorem cat1Fixpoint_skips (rules : List (MonotoneRule C A)) (b : A)
+    (h : ∀ r ∈ rules, OperatorSkips b r.apply) :
+    OperatorSkips b (cat1Fixpoint rules) := by
+  unfold cat1Fixpoint iterateToFixpoint
+  exact iterate_skips b _ (composeMonotone_skips rules b h) _
+
+/-- `cat2Apply` skips `b` if every cat2 rule skips `b`. -/
+theorem cat2Apply_skips (rules : List (NafRule C A)) (b : A)
+    (h : ∀ r ∈ rules, OperatorSkips b r.apply) :
+    OperatorSkips b (cat2Apply rules) := by
+  unfold cat2Apply
+  exact foldl_skips b rules (fun acc r => r.apply acc) h
+
+/-- `processStratum rs a` skips axis `b` whenever `a ≠ b` and no rule at
+axis `a` (cat1 or cat2) reads axis `b`. -/
+theorem processStratum_skips (rs : StratifiedRuleSet C A) (a b : A) (h_ne : a ≠ b)
+    (h_cat1_no_read : ∀ r ∈ rs.cat1 a, b ∉ r.read_axes)
+    (h_cat2_no_read : ∀ r ∈ rs.cat2 a, b ∉ r.read_axes) :
+    OperatorSkips b (processStratum rs a) := by
+  unfold processStratum
+  intro s t h
+  -- cat1Fixpoint preserves agreement-off-b.
+  have h_cat1 : OperatorSkips b (cat1Fixpoint (rs.cat1 a)) := by
+    apply cat1Fixpoint_skips
+    intro r hr
+    have hr_axis : r.axis = a := rs.cat1_axis a r hr
+    refine MonotoneRule.skips_of_axis_ne_and_not_read r b ?_ (h_cat1_no_read r hr)
+    rw [hr_axis]; exact h_ne
+  -- cat2Apply preserves agreement-off-b.
+  have h_cat2 : OperatorSkips b (cat2Apply (rs.cat2 a)) := by
+    apply cat2Apply_skips
+    intro r hr
+    have hr_axis : r.axis = a := rs.cat2_axis a r hr
+    refine NafRule.skips_of_axis_ne_and_not_read r b ?_ (h_cat2_no_read r hr)
+    rw [hr_axis]; exact h_ne
+  -- Compose.
+  have h_after_cat1 : ∀ c' x', x' ≠ b →
+      (cat1Fixpoint (rs.cat1 a) s) c' x' = (cat1Fixpoint (rs.cat1 a) t) c' x' :=
+    h_cat1 s t h
+  exact h_cat2 _ _ h_after_cat1
+
+/-- **Read-independence between same-stratum (or higher) axes follows from
+stratification consistency.** For distinct axes `a` and `b` with
+`strat a ≤ strat b`, `processStratum rs a` skips `b` — by strict
+stratification, no rule at axis `a` reads axis `b`. -/
+theorem processStratum_skips_of_strat_le
+    (rs : StratifiedRuleSet C A) (a b : A) (h_ne : a ≠ b)
+    (h_strat_le : rs.strat.strat a ≤ rs.strat.strat b) :
+    OperatorSkips b (processStratum rs a) := by
+  apply processStratum_skips rs a b h_ne
+  · intro r hr h_b_in
+    rcases rs.cat1_strat_consistent a r hr b h_b_in with h_eq | h_lt
+    · exact h_ne h_eq.symm
+    · exact absurd (lt_of_lt_of_le h_lt h_strat_le) (lt_irrefl _)
+  · intro r hr h_b_in
+    rcases rs.cat2_strat_consistent a r hr b h_b_in with h_eq | h_lt
+    · exact h_ne h_eq.symm
+    · exact absurd (lt_of_lt_of_le h_lt h_strat_le) (lt_irrefl _)
+
 /-! ## `processStratum` for read-independent axes commute
 
-Two `processStratum` invocations for distinct axes `a` and `b` commute when
-neither's rules read the other's axis. `processStratum_only_modifies_axis`
-guarantees they write disjoint cells, but in our current rule formalism
-(`MonotoneRule`, `NafRule`) the `apply` field is an arbitrary
-`State → State`, so a rule at axis `a` *could* read axis `b`'s state and
-thereby produce different outputs depending on whether `b` was processed
-first.
-
-We therefore commute under an explicit **read-independence** hypothesis:
-both `processStratum rs a` and `processStratum rs b` treat each other's
-axis-cells as "frame" — applying them to two states that differ only on
-the unread axis produces results that differ only on that axis.
-
-In a fully developed stratified Datalog formalism, read-independence
-between same-stratum axes would be a structural invariant of the rule
-set; here we expose it as a hypothesis on the operator pair. -/
+Two `processStratum` invocations for distinct axes `a` and `b` commute
+when each skips the other's axis (the `OperatorSkips` predicate above).
+With the `cat{1,2}_strat_consistent` invariants on `StratifiedRuleSet`,
+this skip property is automatic for distinct axes at compatible strata
+— see `processStratum_skips_of_strat_le`. -/
 
 /-- A `processStratum` invocation is **read-independent** of axis `b` if
 applying it to two states that agree on every axis except `b` still
-produces results that agree on every axis except `b`. -/
+produces results that agree on every axis except `b`. Equivalent to
+`OperatorSkips b (processStratum rs a)`; kept as a separate name for
+readability at theorem call sites. -/
 def processStratum_reads_independently (rs : StratifiedRuleSet C A) (a b : A) : Prop :=
-  ∀ s t : State C A, (∀ c x, x ≠ b → s c x = t c x) →
-    ∀ c x, x ≠ b → (processStratum rs a s) c x = (processStratum rs a t) c x
+  OperatorSkips b (processStratum rs a)
 
 /-- **`processStratum` for read-independent distinct axes commute.** Requires
 read-independence in both directions: `a`'s rules don't depend on axis `b`'s

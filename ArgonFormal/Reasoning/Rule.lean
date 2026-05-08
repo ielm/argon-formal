@@ -35,15 +35,23 @@ Three categories of rules in the stratified fixpoint computation:
 variable {C A : Type} [DecidableEq C] [DecidableEq A] [Fintype C] [Fintype A]
 
 variable {C A : Type} [DecidableEq C] [DecidableEq A] in
-/-- The frame property for a rule's `apply` function: the result depends only
-on cells at axes in `read_axes`. Two states that agree on every cell in those
-axis-columns produce equal applications.
+/-- The frame property for a rule's `apply` function: the value written on
+the rule's own `axis` depends only on cells at axes in `read_axes`.
 
-This is the structural read-locality condition. Combined with `axis_local`
-(write-locality), it captures the full read/write boundary of a rule. -/
-def FrameLocal (read_axes : Finset A) (apply : State C A → State C A) : Prop :=
+The natural intuition is "apply is fully determined by read_axes," but
+that's incompatible with `axis_local` — cells outside `read_axes` and
+outside `axis` pass through unchanged from the input, so two inputs
+differing there produce two outputs differing there. The accurate
+read-locality condition is the *axis-restricted* one: the rule's WRITE
+on its own axis is a function of read_axes inputs.
+
+Combined with `axis_local` (the rule writes nothing else), this captures
+the full read/write boundary: outputs are read-determined on `axis` and
+input-passing-through everywhere else. -/
+def FrameLocal (read_axes : Finset A) (axis : A) (apply : State C A → State C A) : Prop :=
   ∀ s t : State C A,
-    (∀ c : C, ∀ b : A, b ∈ read_axes → s c b = t c b) → apply s = apply t
+    (∀ c : C, ∀ b : A, b ∈ read_axes → s c b = t c b) →
+    ∀ c : C, (apply s) c axis = (apply t) c axis
 
 /-- A Category 1 (positive propagation) rule.
 Monotone: only adds IS values, never removes information.
@@ -69,9 +77,9 @@ structure MonotoneRule (C A : Type) [DecidableEq C] [DecidableEq A] where
   /-- The rule only adds IS values (never produces NOT or changes existing values). -/
   only_adds_is : ∀ s : State C A, ∀ c : C,
     s c axis ≠ .can → (apply s) c axis = s c axis
-  /-- The rule's behavior depends only on cells at axes in `read_axes`
-  (read-locality). -/
-  frame_local : FrameLocal read_axes apply
+  /-- The rule's write on its own `axis` depends only on cells at axes
+  in `read_axes` (read-locality). -/
+  frame_local : FrameLocal read_axes axis apply
 
 /-- A Category 2 (negation-as-failure) rule.
 Reads the completed Category 1 fixpoint and produces NOT values. -/
@@ -91,9 +99,9 @@ structure NafRule (C A : Type) [DecidableEq C] [DecidableEq A] where
     (apply s) c axis ≠ s c axis → s c axis = .can ∧ (apply s) c axis = .not
   /-- The rule is monotone: more information in → at least as much NOT out. -/
   monotone : ∀ s t : State C A, s ≤ t → apply s ≤ apply t
-  /-- The rule's behavior depends only on cells at axes in `read_axes`
-  (read-locality). -/
-  frame_local : FrameLocal read_axes apply
+  /-- The rule's write on its own `axis` depends only on cells at axes
+  in `read_axes` (read-locality). -/
+  frame_local : FrameLocal read_axes axis apply
 
 /-- A diagnostic produced by a constraint check. -/
 structure Diagnostic where
