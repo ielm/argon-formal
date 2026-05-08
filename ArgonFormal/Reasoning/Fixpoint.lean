@@ -328,33 +328,42 @@ def IsTopoSort (strat : Stratification A) (sorted : List A) : Prop :=
   ∀ i j : Fin sorted.length, strat.strat (sorted.get i) < strat.strat (sorted.get j) → i < j
 
 /-- **Theorem 1.2: Uniqueness.** The stratified fixpoint result is independent
-of the topological order chosen, as long as the order is a valid topological
-sort of the axis dependency graph.
+of the topological order chosen, as long as the orders are valid topological
+sorts of the axis dependency graph and enumerate the same axes.
 
-## Proof outline (the four lemmas)
+## Hypotheses
 
-1. `processStratum` for axis `a` modifies only positions `(c, a)`. Follows
-   from the `axis_local` field on every `MonotoneRule` and `NafRule`.
+The classical statement requires `sort1` and `sort2` to be **permutations of
+each other** (`h_perm`). Without this, the axiom is vacuously false: e.g.
+`sort1 = []` and `sort2 = [a]` are both technically valid topo sorts but
+clearly produce different results.
 
-2. `processStratum` for distinct axes commute:
-   `processStratum a (processStratum b s) = processStratum b (processStratum a s)`
-   for `a ≠ b`. Follows from (1) — each only modifies its own axis.
+The proof requires a **read-locality** invariant on rules — that cat1 rules
+at axis `a` only read cells at axes `b` with `strat b ≤ strat a`, and cat2
+rules at axis `a` only read cells at axes `b` with `strat b < strat a`.
+These invariants are structural for stratified Datalog (Apt-Blair-Walker
+1988) and would need to be added as fields on `MonotoneRule` / `NafRule`
+or as side conditions on `StratifiedRuleSet`. They give the
+`processStratum_reads_independently` hypothesis required by
+`processStratum_commute` for any pair of same-stratum axes.
 
-3. Any two valid topological sorts of the same stratification can be
-   transformed into each other by a sequence of adjacent transpositions
-   that swap unrelated axes.
+## Proof outline (once read-locality is in place)
 
-4. By induction on the number of transpositions and (2), the fold result
-   is invariant.
+1. `processStratum_only_modifies_axis` — proved.
+2. `processStratum_commute` for distinct axes at the same stratum, under
+   read-independence — proved (with hypothesis).
+3. Any two valid topological sorts of the same multiset of axes are
+   connected by a sequence of adjacent transpositions of same-stratum
+   pairs (purely combinatorial; standard bubble-sort argument over
+   `List.Perm`).
+4. By induction on the transposition chain and (2), the fold result is
+   invariant.
 
-The full mechanization requires `Fin`-indexed permutation reasoning over
-`List.foldl` plus the commutativity lemma. The argument is classical
-(it's the standard "permutation invariance under stratified evaluation"
-result for stratified Datalog — see Apt, Blair & Walker 1988); the Lean
-proof is mechanical-but-substantial. We axiomatize it here pending
-mechanization, with `#print axioms` audit available downstream. -/
+(3) is purely combinatorial (no Argon-specific content) and is the bulk
+of the remaining mechanization work. -/
 axiom stratified_fixpoint_unique (rs : StratifiedRuleSet C A)
     (sort1 sort2 : List A)
+    (_h_perm : sort1.Perm sort2)
     (_hvalid1 : IsTopoSort rs.strat sort1)
     (_hvalid2 : IsTopoSort rs.strat sort2) :
     stratifiedFixpoint rs sort1 State.initial = stratifiedFixpoint rs sort2 State.initial
@@ -364,25 +373,40 @@ application would change any assignment.
 
 ## Proof outline
 
+## Hypotheses
+
+The proof requires the same **read-locality** invariant as
+`stratified_fixpoint_unique` — cat1 rules at axis `a` only read cells at
+axes `b` with `strat b ≤ strat a`, and cat2 rules at axis `a` only read
+cells at axes `b` with `strat b < strat a`. Without read-locality, a
+cat1 rule could re-fire after later strata add new NOT values, breaking
+stability.
+
+## Proof outline (once read-locality is in place)
+
 For axis `a` at stratum k, `processStratum` first runs Cat1 to fixpoint,
 then applies Cat2.
 
-- **Cat1 stability**: `iterateToFixpoint` ran Cat1 rules until stable.
-  After Cat2 runs for axis `a`, the Cat1 rules for axis `a` see the same
-  state on axis `a` (Cat2 only changes CAN → NOT; Cat1 only reads IS
-  values). So Cat1 is still stable.
+- **Cat1 stability**: At axis `a`'s processing time, cat1 ran to a
+  fixpoint of `composeMonotone (rs.cat1 a)`. By
+  `composeMonotone_fixpoint_each_rule`, every individual cat1 rule for
+  axis `a` fixes that state. After cat2 runs at axis `a`, axis-a cells
+  may flip CAN→NOT. Under read-locality (cat1 rules don't read axis a's
+  NOT values), each cat1 rule still fires the same way: its trigger
+  condition reads only strata ≤ k, and strata < k are unchanged from
+  when cat1 was at fixpoint.
 
-- **Cat2 stability**: Cat2 checks absence of IS values. After Cat1
-  fixpoint, no more IS values appear for axis `a`. Cat2's NOT
-  conclusions remain valid after Cat2 runs.
+- **Cat2 stability**: Each cat2 rule's `only_adds_not` field forces
+  `r.apply s ≠ s ↔ s c r.axis = .can`. Under read-locality (cat2 reads
+  only strata < k), cat2 rule firing is determined by strata < k state,
+  which doesn't change after stratum k is processed. So cat2 rules at
+  axis a remain stable.
 
-- For axes processed LATER (stratum > k): their rules don't modify axis
-  `a` (by `axis_local`). So `a`'s stability is preserved.
+- For axes processed LATER (stratum > k): by `processStratum_only_modifies_axis`,
+  axis `a` cells are unchanged. Stability is preserved.
 
-Mechanization requires Cat1+Cat2 commutation reasoning across the full
-fold. The argument is classical for stratified Datalog (Apt-Blair-Walker
-1988; Knaster-Tarski applied per stratum); we axiomatize the per-program
-result here. -/
+Lifting through the full fold and the topological order is mechanical
+once the per-stratum stability lemma is in place. -/
 axiom stratified_fixpoint_stable (rs : StratifiedRuleSet C A)
     (axisSorted : List A) :
     (∀ a, ∀ r ∈ rs.cat1 a,

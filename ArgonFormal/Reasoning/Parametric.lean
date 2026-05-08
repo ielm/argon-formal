@@ -225,13 +225,14 @@ the order is a valid topological sort. Follows from Theorem 1.2 applied
 to the expanded rule set. -/
 theorem parametric_fixpoint_unique (prs : ParametricRuleSet C A)
     (sort1 sort2 : List A)
+    (h_perm : sort1.Perm sort2)
     (hvalid1 : IsTopoSort prs.strat sort1)
     (hvalid2 : IsTopoSort prs.strat sort2) :
     parametricFixpoint prs sort1 State.initial =
     parametricFixpoint prs sort2 State.initial := by
   -- Delegates to Theorem 1.2 on the expanded rule set.
   -- The expanded set uses the same stratification as the parametric set.
-  exact stratified_fixpoint_unique prs.expand sort1 sort2
+  exact stratified_fixpoint_unique prs.expand sort1 sort2 h_perm
     (by rwa [ParametricRuleSet.expand]) (by rwa [ParametricRuleSet.expand])
 
 /-! ## T_P.3: Stability -/

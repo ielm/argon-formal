@@ -36,12 +36,13 @@ Category 3 rules against the stratified fixpoint is deterministic — it does no
 depend on the topological sort order used to compute the fixpoint. -/
 theorem constraint_checks_deterministic (rs : StratifiedRuleSet C A)
     (sort1 sort2 : List A)
+    (h_perm : sort1.Perm sort2)
     (hvalid1 : IsTopoSort rs.strat sort1)
     (hvalid2 : IsTopoSort rs.strat sort2) :
     evaluateConstraints rs.cat3 (stratifiedFixpoint rs sort1 State.initial) =
     evaluateConstraints rs.cat3 (stratifiedFixpoint rs sort2 State.initial) := by
   -- The fixpoints are equal by Theorem 1.2
-  have h := stratified_fixpoint_unique rs sort1 sort2 hvalid1 hvalid2
+  have h := stratified_fixpoint_unique rs sort1 sort2 h_perm hvalid1 hvalid2
   rw [h]
 
 /-- Constraint checks commute: evaluating in any order gives the same diagnostic set.
