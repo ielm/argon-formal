@@ -513,50 +513,161 @@ theorem foldl_processStratum_bubble (rs : StratifiedRuleSet C A) (a : A)
     simp only [List.cons_append, List.foldl_cons]
     rw [h_commute]
 
-/-- **Theorem 1.2: Uniqueness.** The stratified fixpoint result is independent
-of the topological order chosen, as long as the orders are valid topological
-sorts of the axis dependency graph and enumerate the same axes.
+/-! ## Pairwise characterization of `IsTopoSort`
 
-## Hypotheses
+`IsTopoSort` is more conveniently expressed as the `List.Pairwise`
+predicate "consecutive (and indeed all earlier-vs-later) strata are
+non-decreasing." Switching to `Pairwise` gives access to Mathlib's
+`Pairwise.sublist` lemma, which lets us shrink a valid topo sort by
+removing elements (as long as the remaining list is a sublist). -/
 
-- `h_perm` — `sort1` and `sort2` are permutations of each other (without
-  this, the statement is false: `[]` and `[a]` are both vacuously valid
-  topo sorts but give different results).
+/-- `IsTopoSort` equivalence with pairwise non-decreasing strata. -/
+theorem isTopoSort_iff_pairwise (sorted : List A) (strat : Stratification A) :
+    IsTopoSort strat sorted ↔
+    sorted.Pairwise (fun a b => strat.strat a ≤ strat.strat b) := by
+  rw [IsTopoSort, List.pairwise_iff_get]
+  constructor
+  · intro h i j hij
+    by_contra h_lt
+    rw [not_le] at h_lt
+    have := h j i h_lt
+    exact absurd this (asymm hij)
+  · intro h i j h_strat_lt
+    by_contra h_pos
+    push_neg at h_pos
+    rcases lt_or_eq_of_le h_pos with h_lt | h_eq
+    · have := h j i h_lt
+      exact absurd h_strat_lt (not_lt.mpr this)
+    · have hij : i = j := h_eq.symm
+      rw [hij] at h_strat_lt
+      exact lt_irrefl _ h_strat_lt
 
-## Closing this axiom
+/-- A `Sublist` of a valid topo sort is itself a valid topo sort. -/
+theorem IsTopoSort.sublist {strat : Stratification A} {l₁ l₂ : List A}
+    (h_sub : l₁.Sublist l₂) (h : IsTopoSort strat l₂) :
+    IsTopoSort strat l₁ := by
+  rw [isTopoSort_iff_pairwise] at h ⊢
+  exact h.sublist h_sub
 
-The structural infrastructure is now complete:
+/-- The tail of a valid topo sort is a valid topo sort. -/
+theorem IsTopoSort.tail_of_cons {strat : Stratification A} {b : A} {rest : List A}
+    (h : IsTopoSort strat (b :: rest)) :
+    IsTopoSort strat rest :=
+  h.sublist (List.sublist_cons_self b rest)
 
-- `processStratum_only_modifies_axis` (proved unconditionally).
-- `processStratum_commute` (proved with read-independence hypothesis).
-- `processStratum_skips_of_strat_le` (proved — discharges read-independence
-  from `cat{1,2}_strat_consistent`).
-- `foldl_processStratum_bubble` (proved — bubbles an axis to the front of a
-  prefix of equal-stratum, distinct elements via repeated commute).
+/-- Removing the middle element of a valid topo sort preserves validity. -/
+theorem IsTopoSort.remove_middle {strat : Stratification A} {a : A} {pre post : List A}
+    (h : IsTopoSort strat (pre ++ a :: post)) :
+    IsTopoSort strat (pre ++ post) := by
+  apply h.sublist
+  -- (pre ++ post) is a sublist of (pre ++ a :: post).
+  exact (List.Sublist.refl pre).append (List.sublist_cons_self a post)
 
-What remains is purely combinatorial: the inductive argument that two
-valid topo-sort permutations of the same multiset are connected by a chain
-of bubble steps. The argument is:
+/-- Head bound: every element after the head has stratum ≥ head's stratum. -/
+theorem IsTopoSort.head_strat_le {strat : Stratification A} {b : A} {rest : List A}
+    (h : IsTopoSort strat (b :: rest)) :
+    ∀ x ∈ rest, strat.strat b ≤ strat.strat x := by
+  rw [isTopoSort_iff_pairwise] at h
+  intro x hx
+  exact (List.pairwise_cons.mp h).1 x hx
 
-  - Induct on `sort1` length.
-  - In `sort1 = a :: rest`, locate `a` in `sort2` (split as `pre ++ a :: post`).
-  - Show every element of `pre` is at stratum `strat a`: forced by `sort1`
-    valid (rest's strata ≥ strat a, and pre ⊂ rest as multiset) plus
-    `sort2` valid (pre's strata ≤ strat a since they precede a).
-  - Apply `foldl_processStratum_bubble` to move `a` to the front of `sort2`.
-  - IH on the tails (`rest` and `pre ++ post`).
+/-- An element appearing before another in a valid topo sort has stratum
+≤ the later one. -/
+theorem IsTopoSort.strat_le_of_split {strat : Stratification A}
+    {pre : List A} {a : A} {post : List A}
+    (h : IsTopoSort strat (pre ++ a :: post)) :
+    ∀ x ∈ pre, strat.strat x ≤ strat.strat a := by
+  intro x hx
+  rw [isTopoSort_iff_pairwise] at h
+  -- x at some position in pre, a at position pre.length.
+  -- Pairwise gives strat x ≤ strat a directly via List.pairwise_append.
+  rw [List.pairwise_append] at h
+  obtain ⟨_, _, h_cross⟩ := h
+  exact h_cross x hx a List.mem_cons_self
 
-The argument is several screens of Lean and depends on `List.Perm`,
-`Fin`-indexed `List.get`, and the `IsTopoSort` predicate. We axiomatize
-it here with the hypotheses now matching the structure of the bubble
-argument; the proof is mechanical given the bubble lemma. -/
-axiom stratified_fixpoint_unique
+/-! ## Theorem 1.2: Uniqueness
+
+By induction on `sort1`. At each step the head `a` is located in `sort2`
+(split as `pre ++ a :: post`), every element of `pre` is at stratum
+exactly `strat a` (forced by both sorts being valid), `a` is bubbled to
+the front of `sort2` via `foldl_processStratum_bubble`, and the IH
+applies to the tails (`rest` and `pre ++ post`).
+
+The Nodup hypothesis ensures `a` appears exactly once; this is required
+for the perm argument on the tails. Realistic topo sorts are always
+Nodup. -/
+
+/-- **Theorem 1.2: Uniqueness (general form).** Two valid topological
+sorts that enumerate the same axes (no duplicates) produce the same
+stratified fixpoint result, from any starting state. -/
+theorem stratified_fixpoint_unique_general
     (rs : StratifiedRuleSet C A)
     (sort1 sort2 : List A)
-    (_h_perm : sort1.Perm sort2)
-    (_hvalid1 : IsTopoSort rs.strat sort1)
-    (_hvalid2 : IsTopoSort rs.strat sort2) :
-    stratifiedFixpoint rs sort1 State.initial = stratifiedFixpoint rs sort2 State.initial
+    (h_perm : sort1.Perm sort2)
+    (h_nodup : sort1.Nodup)
+    (hvalid1 : IsTopoSort rs.strat sort1)
+    (hvalid2 : IsTopoSort rs.strat sort2)
+    (s₀ : State C A) :
+    stratifiedFixpoint rs sort1 s₀ = stratifiedFixpoint rs sort2 s₀ := by
+  unfold stratifiedFixpoint
+  induction sort1 generalizing sort2 s₀ with
+  | nil =>
+    -- sort2 is also empty (perm of nil is nil).
+    have : sort2 = [] := h_perm.symm.eq_nil
+    rw [this]
+  | cons a rest ih =>
+    have h_a_in_sort2 : a ∈ sort2 := h_perm.mem_iff.mp List.mem_cons_self
+    obtain ⟨pre, post, h_split⟩ := List.append_of_mem h_a_in_sort2
+    -- Bookkeeping from Nodup.
+    have h_nodup_sort2 : sort2.Nodup := h_perm.nodup_iff.mp h_nodup
+    have h_nodup_split : (pre ++ a :: post).Nodup := h_split ▸ h_nodup_sort2
+    have h_a_not_in_pre : a ∉ pre := by
+      intro h_a_in_pre
+      have h_neq := (List.nodup_append.mp h_nodup_split).2.2
+      exact h_neq a h_a_in_pre a List.mem_cons_self rfl
+    have h_pre_ne : ∀ b ∈ pre, b ≠ a := fun b hb h_eq => h_a_not_in_pre (h_eq ▸ hb)
+    -- Pre's elements come from rest (since sort1 = a :: rest perm sort2 = pre ++ a :: post,
+    -- and pre's elements ≠ a, they must be in rest).
+    have h_perm_split : (a :: rest).Perm (pre ++ a :: post) := h_split ▸ h_perm
+    -- Equivalently, rest perm (pre ++ post) by removing a.
+    have h_perm_tails : rest.Perm (pre ++ post) := by
+      have : (a :: rest).Perm (a :: (pre ++ post)) :=
+        h_perm_split.trans List.perm_middle
+      exact (List.perm_cons a).mp this
+    have h_pre_in_rest : ∀ b ∈ pre, b ∈ rest := fun b hb =>
+      h_perm_tails.symm.mem_iff.mp (List.mem_append_left _ hb)
+    -- Strata:
+    have h_rest_strat_ge : ∀ x ∈ rest, rs.strat.strat a ≤ rs.strat.strat x :=
+      hvalid1.head_strat_le
+    have h_pre_strat_le : ∀ x ∈ pre, rs.strat.strat x ≤ rs.strat.strat a := by
+      have hvalid2' : IsTopoSort rs.strat (pre ++ a :: post) := h_split ▸ hvalid2
+      exact hvalid2'.strat_le_of_split
+    have h_pre_strat_eq : ∀ x ∈ pre, rs.strat.strat x = rs.strat.strat a := fun x hx =>
+      le_antisymm (h_pre_strat_le x hx) (h_rest_strat_ge x (h_pre_in_rest x hx))
+    -- Bubble a to the front of sort2.
+    rw [h_split]
+    rw [foldl_processStratum_bubble rs a pre post h_pre_strat_eq h_pre_ne s₀]
+    -- Goal: (a :: rest).foldl s₀ = (a :: pre ++ post).foldl s₀.
+    -- Unfold the cons-foldl on both sides.
+    simp only [List.foldl_cons]
+    -- Goal: rest.foldl (processStratum rs a s₀) = (pre ++ post).foldl (processStratum rs a s₀).
+    -- Apply IH to rest and pre ++ post.
+    have hvalid2' : IsTopoSort rs.strat (pre ++ a :: post) := h_split ▸ hvalid2
+    exact ih (pre ++ post) h_perm_tails (List.nodup_cons.mp h_nodup).2
+      hvalid1.tail_of_cons hvalid2'.remove_middle (processStratum rs a s₀)
+
+/-- **Theorem 1.2: Uniqueness.** Two valid topological sorts of the same
+axis multiset produce the same stratified fixpoint from `State.initial`. -/
+theorem stratified_fixpoint_unique
+    (rs : StratifiedRuleSet C A)
+    (sort1 sort2 : List A)
+    (h_perm : sort1.Perm sort2)
+    (h_nodup : sort1.Nodup)
+    (hvalid1 : IsTopoSort rs.strat sort1)
+    (hvalid2 : IsTopoSort rs.strat sort2) :
+    stratifiedFixpoint rs sort1 State.initial =
+    stratifiedFixpoint rs sort2 State.initial :=
+  stratified_fixpoint_unique_general rs sort1 sort2 h_perm h_nodup hvalid1 hvalid2 _
 
 /-- **Theorem 1.3: Stability.** The result is a fixpoint — no rule
 application would change any assignment.
