@@ -80,30 +80,32 @@ Intuition: more rules can only resolve CAN values — they can't change IS to NO
 or NOT to IS, because rules are monotone (Cat1 only adds IS, Cat2 only adds NOT)
 and determined values are never overwritten.
 
-## Proof sketch
+## Hypothesis shape
 
-Process axes in topological order. At each axis `a`:
+- **Cat1**: set inclusion suffices. `cat1Fixpoint` reaches a least fixpoint, and
+  the LFP characterization (`iterate_le_of_fixpoint_above`) makes the result
+  insensitive to the order of rules in the list.
+- **Cat2**: requires `List.Sublist` rather than set inclusion. NAF rule
+  application is order-dependent (concrete counterexamples exist where
+  reordering produces incomparable states), so arbitrary set-extension is not
+  monotone. The Sublist hypothesis is the natural notion of "rule set
+  extension": new rules are inserted at any position while existing rules
+  retain their relative order. This matches the practical case — rule sets
+  are extended by adding rules, not by reordering.
 
-- **Cat1 phase**: rs₂ runs all of rs₁'s Cat1 rules (by `h_extends`) plus
-  possibly more. Since Cat1 rules are monotone and inflationary, the
-  Cat1 fixpoint of rs₂ is ≥ the Cat1 fixpoint of rs₁ on axis `a`.
-- **Cat2 phase**: rs₂ runs all of rs₁'s Cat2 rules (by `h_extends2`) plus
-  possibly more. Cat2 rules produce NOT values. The Cat2 result of rs₂
-  has at least as many NOT values as rs₁.
-- By induction on strata: each stratum's result for rs₂ is ≥ rs₁'s result.
+## Proof
 
-Mechanization requires the per-stratum `iterateToFixpoint` monotonicity
-lemma (extending the rule list produces a ≥ fixpoint), plus the lift
-through `processStratum` and the fold. Axiomatized here pending
-mechanical proof; the classical argument is straightforward — every step
-of rs₂ refines or matches rs₁'s corresponding step. -/
-axiom extension_monotone
+Direct application of `stratifiedFixpoint_extension` (proved in
+`ArgonFormal.Reasoning.Fixpoint`) at `s = t = State.initial`. -/
+theorem extension_monotone
     (rs₁ rs₂ : StratifiedRuleSet C A)
     (axisSorted : List A)
-    (h_extends : ∀ a, ∀ r ∈ rs₁.cat1 a, r ∈ rs₂.cat1 a)
-    (h_extends2 : ∀ a, ∀ r ∈ rs₁.cat2 a, r ∈ rs₂.cat2 a) :
+    (h_cat1 : ∀ a, ∀ r ∈ rs₁.cat1 a, r ∈ rs₂.cat1 a)
+    (h_cat2 : ∀ a, (rs₁.cat2 a).Sublist (rs₂.cat2 a)) :
     stratifiedFixpoint rs₁ axisSorted State.initial ≤
-    stratifiedFixpoint rs₂ axisSorted State.initial
+    stratifiedFixpoint rs₂ axisSorted State.initial :=
+  stratifiedFixpoint_extension rs₁ rs₂ axisSorted h_cat1 h_cat2
+    State.initial State.initial (le_refl _)
 
 /-- **Theorem 5.3: Consistent extensions resolve CAN to at most one of IS or NOT.**
 If (c, a) = CAN in the original fixpoint, an extension can make it IS or NOT

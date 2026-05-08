@@ -33,49 +33,12 @@ vice versa. But we don't even need this fact — inflationarity is sufficient.
 
 variable {C A : Type} [DecidableEq C] [DecidableEq A] [Fintype C] [Fintype A]
 
-/-! ## NafRule Inflationarity -/
+/-! ## Cross-Stratum Narrowing Preservation
 
-omit [Fintype C] [Fintype A] in
-/-- A `NafRule` application is inflationary: `s ≤ r.apply s`.
+Inflationarity lemmas for `NafRule`, `cat2Apply`, `processStratum`, and
+`stratifiedFixpoint` live in `ArgonFormal.Reasoning` (the layer where the
+operations are defined); imported transitively here. -/
 
-Cat2 rules only change CAN→NOT (by `only_adds_not`) and leave other
-positions unchanged (by `axis_local`). CAN ≤ NOT in the information ordering,
-so every change is an increase. -/
-theorem NafRule.inflationary (r : NafRule C A) (s : State C A) :
-    s ≤ r.apply s := by
-  intro c' a'
-  by_cases ha : a' = r.axis
-  · subst ha
-    by_cases heq : (r.apply s) c' r.axis = s c' r.axis
-    · exact le_of_eq heq.symm
-    · obtain ⟨hcan, _⟩ := r.only_adds_not s c' heq
-      exact (le_of_eq hcan).trans (MetaValue.can_le _)
-  · exact le_of_eq (r.axis_local s c' a' ha).symm
-
-omit [Fintype C] [Fintype A] in
-/-- `cat2Apply` is inflationary: `s ≤ cat2Apply rules s`. -/
-theorem cat2Apply_inflationary (rules : List (NafRule C A)) (s : State C A) :
-    s ≤ cat2Apply rules s := by
-  exact foldl_inflationary (fun s r => NafRule.inflationary r s) rules s
-
-/-! ## Full Stratum and Fixpoint Inflationarity -/
-
-/-- Processing a single stratum is inflationary: `s ≤ processStratum rs a s`. -/
-theorem processStratum_inflationary (rs : StratifiedRuleSet C A) (a : A) (s : State C A) :
-    s ≤ processStratum rs a s := by
-  unfold processStratum
-  exact le_trans (cat1Fixpoint_inflationary (rs.cat1 a) s)
-                 (cat2Apply_inflationary (rs.cat2 a) (cat1Fixpoint (rs.cat1 a) s))
-
-/-- The full stratified fixpoint is inflationary: `s₀ ≤ stratifiedFixpoint rs axisSorted s₀`. -/
-theorem stratifiedFixpoint_inflationary (rs : StratifiedRuleSet C A)
-    (axisSorted : List A) (s₀ : State C A) :
-    s₀ ≤ stratifiedFixpoint rs axisSorted s₀ := by
-  exact foldl_inflationary (fun s a => processStratum_inflationary rs a s) axisSorted s₀
-
-/-! ## Cross-Stratum Narrowing Preservation -/
-
-omit [Fintype C] [Fintype A] in
 /-- Narrowing is preserved through Cat2 application.
 Established as a special case of inflationarity + upward-closure. -/
 theorem narrowing_preserved_cat2 (rules : List (NafRule C A))

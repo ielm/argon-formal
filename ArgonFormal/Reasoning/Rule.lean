@@ -116,3 +116,59 @@ noncomputable def iterateToFixpoint (f : State C A → State C A)
     (s₀ : State C A) : State C A :=
   let bound := Fintype.card C * Fintype.card A + 1
   Nat.iterate f bound s₀
+
+/-! ## Inflationarity of rules
+
+Both `MonotoneRule` and `NafRule` are inflationary in the information
+ordering: applying a rule never decreases the state. This follows from
+the structural fields (`only_adds_is` / `only_adds_not`) plus the
+partial-order definition's `.can`-as-bottom property. -/
+
+/-- Every `MonotoneRule` is inflationary: `s ≤ r.apply s`. Determined cells
+unchanged (by `only_adds_is`); CAN cells potentially become IS, which is
+≥ in the information ordering (`.can` is bottom). -/
+theorem MonotoneRule.inflationary (r : MonotoneRule C A) (s : State C A) :
+    s ≤ r.apply s := by
+  intro c a
+  by_cases hax : a = r.axis
+  · -- On the rule's own axis. Either CAN (becomes anything ≥ .can) or
+    -- determined (unchanged by only_adds_is).
+    by_cases hcan : s c a = .can
+    · -- .can ≤ anything.
+      rw [hcan]; exact MetaValue.can_le _
+    · -- Determined; rule preserves.
+      rw [hax] at hcan ⊢
+      rw [r.only_adds_is s c hcan]
+  · -- Off the rule's axis; rule preserves by axis_local.
+    rw [r.axis_local s c a hax]
+
+/-- Every `NafRule` is inflationary: `s ≤ r.apply s`. Same shape as
+`MonotoneRule.inflationary` but uses `only_adds_not`: a NAF rule may
+flip CAN → NOT, which is ≥ in the information ordering. -/
+theorem NafRule.inflationary (r : NafRule C A) (s : State C A) :
+    s ≤ r.apply s := by
+  intro c a
+  by_cases hax : a = r.axis
+  · by_cases h_eq : (r.apply s) c a = s c a
+    · -- Unchanged.
+      rw [h_eq]
+    · -- Changed; by only_adds_not, was CAN, now NOT.
+      rw [hax] at h_eq
+      have h_eq' : (r.apply s) c r.axis ≠ s c r.axis := h_eq
+      obtain ⟨hcan, _⟩ := r.only_adds_not s c h_eq'
+      rw [hax]
+      rw [hcan]; exact MetaValue.can_le _
+  · rw [r.axis_local s c a hax]
+
+/-- `composeMonotone` is inflationary: folding over monotone rules from
+state `s` produces a state ≥ `s`. -/
+theorem composeMonotone_inflationary (rules : List (MonotoneRule C A))
+    (s : State C A) : s ≤ composeMonotone rules s := by
+  induction rules generalizing s with
+  | nil => exact le_refl s
+  | cons r rs ih =>
+    -- composeMonotone (r :: rs) s = composeMonotone rs (r.apply s).
+    -- s ≤ r.apply s (inflation) ≤ composeMonotone rs (r.apply s) (IH).
+    simp only [composeMonotone, List.foldl]
+    exact le_trans (r.inflationary s) (ih (r.apply s))
+
