@@ -1,0 +1,38 @@
+name = "argon-formal"
+version = "0.1.0"
+keywords = ["math"]
+defaultTargets = ["ArgonFormal"]
+
+[leanOptions]
+pp.unicode.fun = true # pretty-prints `fun a ↦ b`
+relaxedAutoImplicit = false
+weak.linter.mathlibStandardSet = true
+maxSynthPendingDepth = 3
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.29.0"
+
+# ── Argon's Lean 4 mechanical-proof workspace ──────────────────────
+#
+# One library, deep hierarchy. The directory layout mirrors the
+# conceptual layering of Argon's formal content:
+#
+#   Foundation/    truth values, bilattice, lattice contexts, projection
+#   Schema/        signatures, TBox/ABox, ontology, type graph,
+#                  world-assumption maps
+#   Reasoning/     state, rules, fixpoints, stratification, AFT operators
+#   TypeSystem/    narrowing predicates + flow-typing soundness theorems
+#   Standpoint/    per-standpoint composition, federation, consistency
+#                  policy, RFD-0016 backward-compat
+#   Decidability/  per-fragment decidability + complexity bounds
+#   Locality/      CWA / locality / sheaf-equivalence
+#
+# Cross-area imports are explicit: `import ArgonFormal.Foundation.Truth4`
+# from a `TypeSystem/` file is the natural shape. No artificial library
+# boundaries; `lake build` builds everything; one namespace root keeps
+# collisions from arising at the import surface.
+
+[[lean_lib]]
+name = "ArgonFormal"

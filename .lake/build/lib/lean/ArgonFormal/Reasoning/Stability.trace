@@ -1,0 +1,60 @@
+{"synthetic": false,
+ "schemaVersion": "2025-09-10",
+ "outputs":
+ {"o": ["c128f1263e4fd831.olean"],
+  "i": "96bdf7c46a75dc75.ilean",
+  "c": "73c8b8ff4b95d23f.c"},
+ "log":
+ [{"message":
+   ".> LEAN_PATH=/Users/ivanleon/Code/argon-formal/.lake/packages/Cli/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/batteries/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/Qq/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/aesop/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/proofwidgets/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/importGraph/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/LeanSearchClient/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/plausible/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/mathlib/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/build/lib/lean /Users/ivanleon/.elan/toolchains/leanprover--lean4---v4.29.0/bin/lean /Users/ivanleon/Code/argon-formal/ArgonFormal/Reasoning/Stability.lean -o /Users/ivanleon/Code/argon-formal/.lake/build/lib/lean/ArgonFormal/Reasoning/Stability.olean -i /Users/ivanleon/Code/argon-formal/.lake/build/lib/lean/ArgonFormal/Reasoning/Stability.ilean -c /Users/ivanleon/Code/argon-formal/.lake/build/ir/ArgonFormal/Reasoning/Stability.c --setup /Users/ivanleon/Code/argon-formal/.lake/build/ir/ArgonFormal/Reasoning/Stability.setup.json --json",
+   "level": "trace"},
+  {"message":
+   "ArgonFormal/Reasoning/Stability.lean:42:0: automatically included section variable(s) unused in theorem `State.always_consistent`:\n  [Fintype C]\n  [Fintype A]\nconsider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:\n  omit [Fintype C] [Fintype A] in theorem ...\n\nNote: This linter can be disabled with `set_option linter.unusedSectionVars false`",
+   "level": "warning"},
+  {"message":
+   "ArgonFormal/Reasoning/Stability.lean:41:0: `State.always_consistent` does not use the following hypotheses in its type:\n  • [Fintype C] (#5)\n  • [Fintype A] (#6)\n\nConsider replacing these hypotheses with the corresponding instances of `Finite` and using `Fintype.ofFinite` in the proof, or removing them entirely.\n\nNote: This linter can be disabled with `set_option linter.unusedFintypeInType false`",
+   "level": "warning"},
+  {"message":
+   "ArgonFormal/Reasoning/Stability.lean:111:0: automatically included section variable(s) unused in theorem `can_resolves_uniquely`:\n  [Fintype C]\n  [Fintype A]\nconsider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:\n  omit [Fintype C] [Fintype A] in theorem ...\n\nNote: This linter can be disabled with `set_option linter.unusedSectionVars false`",
+   "level": "warning"},
+  {"message":
+   "ArgonFormal/Reasoning/Stability.lean:114:5: unused variable `h_can`\n\nNote: This linter can be disabled with `set_option linter.unusedVariables false`",
+   "level": "warning"},
+  {"message":
+   "ArgonFormal/Reasoning/Stability.lean:117:5: unused variable `h_ext1`\n\nNote: This linter can be disabled with `set_option linter.unusedVariables false`",
+   "level": "warning"},
+  {"message":
+   "ArgonFormal/Reasoning/Stability.lean:118:5: unused variable `h_ext2`\n\nNote: This linter can be disabled with `set_option linter.unusedVariables false`",
+   "level": "warning"},
+  {"message":
+   "ArgonFormal/Reasoning/Stability.lean:108:0: `can_resolves_uniquely` does not use the following hypotheses in its type:\n  • [Fintype C] (#5)\n  • [Fintype A] (#6)\n\nConsider replacing these hypotheses with the corresponding instances of `Finite` and using `Fintype.ofFinite` in the proof, or removing them entirely.\n\nNote: This linter can be disabled with `set_option linter.unusedFintypeInType false`",
+   "level": "warning"}],
+ "inputs":
+ [["ArgonFormal.Reasoning.Stability:deps",
+   [["deps",
+     [["«argon-formal»/ArgonFormal:extraDep",
+       [["@«argon-formal»:extraDep", "00000000000006bb"]]],
+      ["imports",
+       [["ArgonFormal.Reasoning.Fixpoint transitive imports (legacy)",
+         "bec818ef3181c70f"],
+        ["ArgonFormal.Reasoning.Fixpoint:importAllArts",
+         "a81ff37dfa40aeeb"]]]]],
+    ["libs",
+     [["import dynlibs", "00000000000006bb"],
+      ["package external libraries", "00000000000006bb"],
+      ["module dynlibs", "00000000000006bb"],
+      ["module plugins", "00000000000006bb"]]]]],
+  ["Lean 4.29.0, commit 98dc76e3c0a9b856c9b98726b713fb04fab16740",
+   "60bb08ef22408c8a"],
+  ["/Users/ivanleon/Code/argon-formal/ArgonFormal/Reasoning/Stability.lean",
+   "fdc56bc793b9e862"],
+  ["options",
+   [["-DmaxSynthPendingDepth=3", "c78e353d34de85d4"],
+    ["-Dweak.linter.mathlibStandardSet=true", "8a155799906f2b42"],
+    ["-DrelaxedAutoImplicit=false", "74a2b5546b55be80"],
+    ["-Dpp.unicode.fun=true", "9b94070140457fab"]]],
+  ["isModule: false", "feefd2a0d3a1847e"],
+  ["Module.name: ArgonFormal.Reasoning.Stability", "cc86109bd1f417d3"],
+  ["Package.id?: (some argon-formal)", "30020946a381fb23"],
+  ["Module.leanArgs: #[]", "00000000000006bb"]],
+ "depHash": "c9d10f910221f7c0"}

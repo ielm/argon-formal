@@ -1,0 +1,67 @@
+{"synthetic": false,
+ "schemaVersion": "2025-09-10",
+ "outputs":
+ {"o": ["eb24e789262701bb.olean"],
+  "i": "5068e1a3c128ff1b.ilean",
+  "c": "d616a9e77dfdcbfb.c"},
+ "log":
+ [{"message":
+   ".> LEAN_PATH=/Users/ivanleon/Code/argon-formal/.lake/packages/Cli/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/batteries/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/Qq/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/aesop/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/proofwidgets/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/importGraph/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/LeanSearchClient/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/plausible/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/mathlib/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/build/lib/lean /Users/ivanleon/.elan/toolchains/leanprover--lean4---v4.29.0/bin/lean /Users/ivanleon/Code/argon-formal/ArgonFormal/TypeSystem/Soundness/Defeasibility.lean -o /Users/ivanleon/Code/argon-formal/.lake/build/lib/lean/ArgonFormal/TypeSystem/Soundness/Defeasibility.olean -i /Users/ivanleon/Code/argon-formal/.lake/build/lib/lean/ArgonFormal/TypeSystem/Soundness/Defeasibility.ilean -c /Users/ivanleon/Code/argon-formal/.lake/build/ir/ArgonFormal/TypeSystem/Soundness/Defeasibility.c --setup /Users/ivanleon/Code/argon-formal/.lake/build/ir/ArgonFormal/TypeSystem/Soundness/Defeasibility.setup.json --json",
+   "level": "trace"},
+  {"message":
+   "ArgonFormal/TypeSystem/Soundness/Defeasibility.lean:58:16: 'simp at hp' is a flexible tactic modifying 'hp'. Try 'simp?' and use the suggested 'simp only [...]'. Alternatively, use `suffices` to explicitly state the simplified form.\n\nNote: This linter can be disabled with `set_option linter.flexible false`",
+   "level": "warning"},
+  {"message":
+   "ArgonFormal/TypeSystem/Soundness/Defeasibility.lean:58:28: 'subst hp' uses 'hp'!",
+   "level": "info"},
+  {"message":
+   "ArgonFormal/TypeSystem/Soundness/Defeasibility.lean:84:16: 'simp at hp' is a flexible tactic modifying 'hp'. Try 'simp?' and use the suggested 'simp only [...]'. Alternatively, use `suffices` to explicitly state the simplified form.\n\nNote: This linter can be disabled with `set_option linter.flexible false`",
+   "level": "warning"},
+  {"message":
+   "ArgonFormal/TypeSystem/Soundness/Defeasibility.lean:84:28: 'subst hp' uses 'hp'!",
+   "level": "info"},
+  {"message":
+   "ArgonFormal/TypeSystem/Soundness/Defeasibility.lean:84:16: 'simp at hp' is a flexible tactic modifying 'hp'. Try 'simp?' and use the suggested 'simp only [...]'. Alternatively, use `suffices` to explicitly state the simplified form.\n\nNote: This linter can be disabled with `set_option linter.flexible false`",
+   "level": "warning"},
+  {"message":
+   "ArgonFormal/TypeSystem/Soundness/Defeasibility.lean:85:4: 'show s_before () true = .is' uses 'hp'!",
+   "level": "info"},
+  {"message":
+   "ArgonFormal/TypeSystem/Soundness/Defeasibility.lean:93:4: 'simp [s_before, s_after] at h' is a flexible tactic modifying 'h'. Try 'simp?' and use the suggested 'simp only [...]'. Alternatively, use `suffices` to explicitly state the simplified form.\n\nNote: This linter can be disabled with `set_option linter.flexible false`",
+   "level": "warning"},
+  {"message":
+   "ArgonFormal/TypeSystem/Soundness/Defeasibility.lean:94:4: 'exact MetaValue.is_not_le_not h' uses 'h'!",
+   "level": "info"},
+  {"message":
+   "ArgonFormal/TypeSystem/Soundness/Defeasibility.lean:85:4: The `show` tactic should only be used to indicate intermediate goal states for readability.\nHowever, this tactic invocation changed the goal. Please use `change` instead for these purposes.\n\nNote: This linter can be disabled with `set_option linter.style.show false`",
+   "level": "warning"}],
+ "inputs":
+ [["ArgonFormal.TypeSystem.Soundness.Defeasibility:deps",
+   [["deps",
+     [["«argon-formal»/ArgonFormal:extraDep",
+       [["@«argon-formal»:extraDep", "00000000000006bb"]]],
+      ["imports",
+       [["ArgonFormal.TypeSystem.NarrowEnv transitive imports (legacy)",
+         "5caacfd95421e944"],
+        ["ArgonFormal.TypeSystem.NarrowEnv:importAllArts",
+         "5d52dbdec4b34c93"]]]]],
+    ["libs",
+     [["import dynlibs", "00000000000006bb"],
+      ["package external libraries", "00000000000006bb"],
+      ["module dynlibs", "00000000000006bb"],
+      ["module plugins", "00000000000006bb"]]]]],
+  ["Lean 4.29.0, commit 98dc76e3c0a9b856c9b98726b713fb04fab16740",
+   "60bb08ef22408c8a"],
+  ["/Users/ivanleon/Code/argon-formal/ArgonFormal/TypeSystem/Soundness/Defeasibility.lean",
+   "98f0240af09efed2"],
+  ["options",
+   [["-DmaxSynthPendingDepth=3", "c78e353d34de85d4"],
+    ["-Dweak.linter.mathlibStandardSet=true", "8a155799906f2b42"],
+    ["-DrelaxedAutoImplicit=false", "74a2b5546b55be80"],
+    ["-Dpp.unicode.fun=true", "9b94070140457fab"]]],
+  ["isModule: false", "feefd2a0d3a1847e"],
+  ["Module.name: ArgonFormal.TypeSystem.Soundness.Defeasibility",
+   "0bc26542747683d0"],
+  ["Package.id?: (some argon-formal)", "30020946a381fb23"],
+  ["Module.leanArgs: #[]", "00000000000006bb"]],
+ "depHash": "697e5be8b53e5af7"}

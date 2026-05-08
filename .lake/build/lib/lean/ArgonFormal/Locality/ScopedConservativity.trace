@@ -1,0 +1,48 @@
+{"synthetic": false,
+ "schemaVersion": "2025-09-10",
+ "outputs":
+ {"o": ["6a4e1086457de9f8.olean"],
+  "i": "173cee0d7e21c9e6.ilean",
+  "c": "6acafa6d928b2aa0.c"},
+ "log":
+ [{"message":
+   ".> LEAN_PATH=/Users/ivanleon/Code/argon-formal/.lake/packages/Cli/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/batteries/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/Qq/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/aesop/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/proofwidgets/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/importGraph/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/LeanSearchClient/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/plausible/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/packages/mathlib/.lake/build/lib/lean:/Users/ivanleon/Code/argon-formal/.lake/build/lib/lean /Users/ivanleon/.elan/toolchains/leanprover--lean4---v4.29.0/bin/lean /Users/ivanleon/Code/argon-formal/ArgonFormal/Locality/ScopedConservativity.lean -o /Users/ivanleon/Code/argon-formal/.lake/build/lib/lean/ArgonFormal/Locality/ScopedConservativity.olean -i /Users/ivanleon/Code/argon-formal/.lake/build/lib/lean/ArgonFormal/Locality/ScopedConservativity.ilean -c /Users/ivanleon/Code/argon-formal/.lake/build/ir/ArgonFormal/Locality/ScopedConservativity.c --setup /Users/ivanleon/Code/argon-formal/.lake/build/ir/ArgonFormal/Locality/ScopedConservativity.setup.json --json",
+   "level": "trace"},
+  {"message":
+   "ArgonFormal/Locality/ScopedConservativity.lean:19:0: automatically included section variable(s) unused in theorem `abox_unchanged`:\n  [DecidableEq IN]\nconsider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:\n  omit [DecidableEq IN] in theorem ...\n\nNote: This linter can be disabled with `set_option linter.unusedSectionVars false`",
+   "level": "warning"},
+  {"message":
+   "ArgonFormal/Locality/ScopedConservativity.lean:19:0: `abox_unchanged` does not use the following hypothesis in its type:\n  • [DecidableEq IN] (#6)\n\nConsider removing this hypothesis and using `classical` in the proof instead. For terms, consider using `open scoped Classical in` at the term level (not the command level).\n\nNote: This linter can be disabled with `set_option linter.unusedDecidableInType false`",
+   "level": "warning"},
+  {"message":
+   "ArgonFormal/Locality/ScopedConservativity.lean:26:25: This simp argument is unused:\n  abox_unchanged\n\nHint: Omit it from the simp argument list.\n  simp [Ontology.domain,̵ ̵a̵b̵o̵x̵_̵u̵n̵c̵h̵a̵n̵g̵e̵d̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`",
+   "level": "warning"}],
+ "inputs":
+ [["ArgonFormal.Locality.ScopedConservativity:deps",
+   [["deps",
+     [["«argon-formal»/ArgonFormal:extraDep",
+       [["@«argon-formal»:extraDep", "00000000000006bb"]]],
+      ["imports",
+       [["ArgonFormal.Locality.Cwa transitive imports (legacy)",
+         "674d74b15ea32294"],
+        ["ArgonFormal.Locality.Cwa:importAllArts", "823fede03fd88fef"]]]]],
+    ["libs",
+     [["import dynlibs", "00000000000006bb"],
+      ["package external libraries", "00000000000006bb"],
+      ["module dynlibs", "00000000000006bb"],
+      ["module plugins", "00000000000006bb"]]]]],
+  ["Lean 4.29.0, commit 98dc76e3c0a9b856c9b98726b713fb04fab16740",
+   "60bb08ef22408c8a"],
+  ["/Users/ivanleon/Code/argon-formal/ArgonFormal/Locality/ScopedConservativity.lean",
+   "d1ee26f32f735fee"],
+  ["options",
+   [["-DmaxSynthPendingDepth=3", "c78e353d34de85d4"],
+    ["-Dweak.linter.mathlibStandardSet=true", "8a155799906f2b42"],
+    ["-DrelaxedAutoImplicit=false", "74a2b5546b55be80"],
+    ["-Dpp.unicode.fun=true", "9b94070140457fab"]]],
+  ["isModule: false", "feefd2a0d3a1847e"],
+  ["Module.name: ArgonFormal.Locality.ScopedConservativity",
+   "ddbcbe9290760ac8"],
+  ["Package.id?: (some argon-formal)", "30020946a381fb23"],
+  ["Module.leanArgs: #[]", "00000000000006bb"]],
+ "depHash": "f52015d4e68c8ab7"}
