@@ -160,35 +160,64 @@ axiom stratified_fixpoint_stable (rs : StratifiedRuleSet C A)
 /-! ## Key Lemma: Monotone Composition on Finite Domains -/
 
 /-- On a finite domain, a monotone inflationary operator reaches its
-fixpoint in at most `n` steps, where `n = |C| * |A| + 1`.
+fixpoint in at most `numCan State.initial` steps.
 
 An operator `f` is inflationary if `s ≤ f s` for all `s`. Cat1 rules are
 inflationary: they only ADD IS values.
 
-## Proof strategy
+## Proof
 
-The chain `initial ≤ f(initial) ≤ f²(initial) ≤ ...` is ascending by
-inflationarity. On a finite type (each cell has 3 possible values, finite
-cells), ascending chains must stabilize in `≤ |C| * |A|` steps because
-`numCan` strictly decreases at each non-fixpoint step:
-
-- If `f s ≠ s` and `s ≤ f s`, then ∃ (c, a) with `s c a < f s c a`.
-- The only way `s c a < f s c a` is `s c a = .can` and `f s c a ≠ .can`.
-- So at least one CAN cell becomes determined: `numCan (f s) < numCan s`.
-- After at most `numCan State.initial = |C| * |A|` steps, no CAN remains
-  to decrease, forcing a fixpoint.
+Strong induction on `numCan s`: at each non-fixpoint step `s ≠ f s`, the
+information ordering plus `s ≤ f s` (from inflation) forces at least one
+CAN cell to become determined, so `numCan (f s) < numCan s`. The chain
+must therefore reach a fixpoint within `numCan State.initial` iterations.
 
 This is the Knaster-Tarski theorem applied to a finite poset (Knaster
-1928; Tarski 1955). Lean mechanization needs the `numCan` strict-decrease
-lemma plus the cell-level `<` characterization. Axiomatized here pending
-the mechanical witness. -/
-axiom monotone_inflationary_fixpoint_finite
+1928; Tarski 1955), specialized to the IS/CAN/NOT lattice via the
+`numCan` measure.
+
+The auxiliary `monotone_inflationary_fixpoint_from_state` is the strong
+form: from any starting state, a fixpoint is reached. The headline
+theorem instantiates with `State.initial`. -/
+theorem monotone_inflationary_fixpoint_from_state
     (f : State C A → State C A)
     (_hmono : ∀ s t : State C A, s ≤ t → f s ≤ f t)
-    (_hinfl : ∀ s : State C A, s ≤ f s) :
+    (hinfl : ∀ s : State C A, s ≤ f s)
+    (s : State C A) :
+    ∃ n : Nat, ∃ result : State C A,
+      (Nat.iterate f n s = result) ∧ (f result = result) := by
+  -- Strong induction on `State.numCan s`.
+  generalize hN : State.numCan s = N
+  induction N using Nat.strong_induction_on generalizing s with
+  | _ N ih =>
+    by_cases h_fp : f s = s
+    · -- s is already a fixpoint; take n = 0.
+      exact ⟨0, s, rfl, h_fp⟩
+    · -- s ≠ f s. By inflation s ≤ f s, so numCan (f s) < numCan s = N.
+      have h_le : s ≤ f s := hinfl s
+      have h_ne : s ≠ f s := fun heq => h_fp heq.symm
+      have h_lt : State.numCan (f s) < State.numCan s :=
+        State.numCan_lt_of_lt_ne h_le h_ne
+      rw [hN] at h_lt
+      -- Apply IH at numCan (f s) to get a fixpoint reached from f s.
+      obtain ⟨k, result, hk_iter, hk_fp⟩ :=
+        ih (State.numCan (f s)) h_lt (s := f s) rfl
+      -- Iterate from s for k+1 steps = iterate from f s for k steps = result.
+      refine ⟨k + 1, result, ?_, hk_fp⟩
+      rw [Function.iterate_succ_apply]
+      exact hk_iter
+
+/-- The headline theorem: a monotone inflationary operator on the
+`State C A` finite domain has a fixpoint reachable from `State.initial`
+in finitely many iteration steps. -/
+theorem monotone_inflationary_fixpoint_finite
+    (f : State C A → State C A)
+    (hmono : ∀ s t : State C A, s ≤ t → f s ≤ f t)
+    (hinfl : ∀ s : State C A, s ≤ f s) :
     ∃ n : Nat, ∃ result : State C A,
       (Nat.iterate f n State.initial = result) ∧
-      (f result = result)
+      (f result = result) :=
+  monotone_inflationary_fixpoint_from_state f hmono hinfl State.initial
 
 /-- The fixpoint of a monotone inflationary operator on a finite domain is
 unique (it is the least fixpoint). Direct application of `le_antisymm`. -/
