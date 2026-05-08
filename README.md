@@ -56,8 +56,8 @@ Rules, fixpoints, and the stratified-Datalog-style operators that drive the meta
 - `State.lean` — assignment state `C → A → MetaValue`, pointwise information ordering, single-position `refine` update.
 - `Stratification.lean` — topological ordering of axes by dependency.
 - `Rule.lean` — `MonotoneRule` (Cat 1, positive propagation), `NafRule` (Cat 2, negation-as-failure), `ConstraintCheck` (Cat 3), `StratifiedRuleSet`. Composition + bounded fixpoint iteration helpers.
-- `Fixpoint.lean` — `cat1Fixpoint`, `cat2Apply`, `processStratum`, `stratifiedFixpoint`. Theorem 1.1 (termination); Theorem 1.2 (uniqueness — axiomatized, classical); Theorem 1.3 (stability — axiomatized, classical); least-fixpoint uniqueness.
-- `Stability.lean` — Theorem 5: CAN-stability (extension of fixpoints under additional rules; axiomatized).
+- `Fixpoint.lean` — `cat1Fixpoint`, `cat2Apply`, `processStratum`, `stratifiedFixpoint`. Theorem 1.1 (termination); Theorem 1.2 (uniqueness — axiomatized, classical); Theorem 1.3 (stability — axiomatized, classical); least-fixpoint uniqueness; `monotone_inflationary_fixpoint_finite` (proved); `cat1Fixpoint_is_fixpoint` (proved); axis-locality and commutation lemmas; rule-set extension monotonicity (proved).
+- `Stability.lean` — Theorem 5: CAN-stability. `extension_monotone` (proved, via cat2 sublist-monotonicity).
 - `Composition.lean` — Theorem 4: package composition preserves convergence.
 - `Necessity.lean` — Theorem 2: acyclicity is necessary for the fixpoint.
 - `Parametric.lean` — parametric propagation via expansion equivalence (lazy = eager).
@@ -90,7 +90,7 @@ Cross-standpoint composition + the AFT-grounded truth-value framework.
 Decidability of Argon's refinement-predicate fragment.
 
 - `Fragment.lean` — inductive grammar of the refinement-predicate language.
-- `Domain1/TC.lean` — transitive closure decidability on finite types: `transGenDecidable` instance via bounded `iterReachable`. Soundness proven; saturation step axiomatized (ascending-chain argument).
+- `Domain1/TC.lean` — transitive closure decidability on finite types: `transGenDecidable` instance via bounded `iterReachable`. Soundness and saturation (`iterReachable_saturates`) both proved.
 - `Domain1/Eval.lean` — finite-domain evaluation semantics for Domain 1 predicates.
 - `Domain1/Decidability.lean` — Theorem 1: Domain 1 decidability.
 - `Domain2/Theories.lean` — Domain 2 theory inclusion (axiomatic; satisfaction relation + decidability witnesses cited from primary sources).
@@ -143,27 +143,24 @@ Future RFDs land as new top-level subdirectories or files within existing areas:
 
 ## Axioms used
 
-Eleven axioms total. Run `#print axioms <theorem>` from any downstream theorem to inspect what it actually depends on.
+Eight axioms total. Run `#print axioms <theorem>` from any downstream theorem to inspect what it actually depends on.
 
-### External mathematical facts (7 axioms)
+### External mathematical facts (6 axioms)
 
 Results from external systems / well-known classical theorems we depend on but don't reprove.
 
 - `Decidability/Domain2/Theories.lean` — `d2Sat`, `qfliaDecidable`, `gnfoDecidable`, `d2CombinedDecidable` (4 axioms): the satisfaction relation for Domain 2 predicates and the decidability witnesses for QF-LIA and GNFO fragments. Decidability is classical: Ginsburg-Spanier 1966 for QF-LIA; Bárány-ten Cate-Segoufin 2015 for GNFO.
 - `Decidability/Complexity/Bounds.lean` — `qfliaNP`, `gnfo2ExpTime` (2 axioms): complexity classifications cited from primary sources.
 
-### Argon proof obligations (4 axioms)
+### Argon proof obligations (2 axioms)
 
-Classical results we're confident hold but whose Lean mechanizations are substantial proof work. Each carries a full proof outline in its docstring.
+Classical results we're confident hold but whose Lean mechanizations require introducing a read-locality structural invariant on rules. Each carries a full proof outline in its docstring.
 
 - `Reasoning/Fixpoint.lean`:
-  - `stratified_fixpoint_unique` — topo-sort independence of the fixpoint (Apt-Blair-Walker 1988).
-  - `stratified_fixpoint_stable` — fixpoint witness (Knaster-Tarski applied per stratum).
-  - `monotone_inflationary_fixpoint_finite` — the ACC argument over the `numCan`-strict-decrease chain on a finite poset.
-- `Reasoning/Stability.lean` — `extension_monotone`: rule-set extension produces ≥ fixpoint.
-- `Decidability/Domain1/TC.lean` — `iterReachable_saturates`: bounded-reachability saturation by `Fintype.card C` iterations.
+  - `stratified_fixpoint_unique` — topo-sort independence of the fixpoint (Apt-Blair-Walker 1988). Requires a purely combinatorial topo-sort swap chain plus read-locality between same-stratum axes for `processStratum_commute`.
+  - `stratified_fixpoint_stable` — fixpoint witness (Knaster-Tarski applied per stratum). Requires read-locality so cat1 rules don't re-fire after cat2 adds NOT values, and so cat2 rule firing is determined by strictly-lower strata that don't change later.
 
-These are tracked as proof obligations; the mathematical content is settled.
+The infrastructure for closing both is in place: `processStratum_only_modifies_axis`, `processStratum_commute` (under explicit read-independence), `composeMonotone_fixpoint_each_rule`, and the various per-component axis-locality lemmas. The remaining work is (a) the combinatorial topo-sort swap argument, and (b) introducing read-locality as a structural field on `MonotoneRule` / `NafRule` (or as a side condition on `StratifiedRuleSet`).
 
 ## License
 
