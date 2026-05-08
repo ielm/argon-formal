@@ -105,6 +105,146 @@ noncomputable def stratifiedFixpoint (rs : StratifiedRuleSet C A)
     (axisSorted : List A) (s₀ : State C A) : State C A :=
   axisSorted.foldl (fun s a => processStratum rs a s) s₀
 
+/-! ## `processStratum` only modifies its own axis
+
+Every rule in `rs.cat1 a` and `rs.cat2 a` has `axis = a` (by the
+`StratifiedRuleSet` invariants `cat1_axis` and `cat2_axis`). Each rule's
+`axis_local` field then says cells off the rule's axis are preserved.
+Lifting through `composeMonotone` (foldl of cat1 rules), iteration to
+fixpoint, and `cat2Apply` (foldl of cat2 rules) gives the result. -/
+
+/-- A list-foldl helper: if every step preserves cells at position `(c, a')`,
+the fold preserves them too. -/
+private theorem foldl_preserves_at_pos {β : Type*} (l : List β)
+    (f : State C A → β → State C A) (s : State C A) (c : C) (a' : A)
+    (h_step : ∀ s' b, b ∈ l → (f s' b) c a' = s' c a') :
+    (l.foldl f s) c a' = s c a' := by
+  induction l generalizing s with
+  | nil => rfl
+  | cons b rest ih =>
+    simp only [List.foldl]
+    rw [ih (f s b) (fun s' b' hb' => h_step s' b' (List.mem_cons_of_mem b hb'))]
+    exact h_step s b List.mem_cons_self
+
+/-- A `Nat.iterate` helper: if `f` preserves cells at position `(c, a')`,
+all iterates do. -/
+private theorem iterate_preserves_at_pos (f : State C A → State C A)
+    (c : C) (a' : A) (h_step : ∀ s, (f s) c a' = s c a')
+    (n : Nat) (s : State C A) : (Nat.iterate f n s) c a' = s c a' := by
+  induction n generalizing s with
+  | zero => rfl
+  | succ n ih =>
+    rw [Function.iterate_succ_apply]
+    rw [ih (f s)]
+    exact h_step s
+
+/-- `composeMonotone` of rules all with axis `a` preserves cells off axis `a`. -/
+theorem composeMonotone_axis_local (rules : List (MonotoneRule C A)) (a : A)
+    (h_axis : ∀ r ∈ rules, r.axis = a) (s : State C A) (c : C) (a' : A)
+    (hne : a' ≠ a) : (composeMonotone rules s) c a' = s c a' := by
+  unfold composeMonotone
+  apply foldl_preserves_at_pos
+  intro s' r hr
+  have hr_axis : r.axis = a := h_axis r hr
+  exact r.axis_local s' c a' (by rw [hr_axis]; exact hne)
+
+/-- `cat1Fixpoint` of rules all with axis `a` preserves cells off axis `a`. -/
+theorem cat1Fixpoint_axis_local (rules : List (MonotoneRule C A)) (a : A)
+    (h_axis : ∀ r ∈ rules, r.axis = a) (s : State C A) (c : C) (a' : A)
+    (hne : a' ≠ a) : (cat1Fixpoint rules s) c a' = s c a' := by
+  unfold cat1Fixpoint iterateToFixpoint
+  exact iterate_preserves_at_pos _ c a'
+    (fun s' => composeMonotone_axis_local rules a h_axis s' c a' hne) _ s
+
+/-- `cat2Apply` of rules all with axis `a` preserves cells off axis `a`. -/
+theorem cat2Apply_axis_local (rules : List (NafRule C A)) (a : A)
+    (h_axis : ∀ r ∈ rules, r.axis = a) (s : State C A) (c : C) (a' : A)
+    (hne : a' ≠ a) : (cat2Apply rules s) c a' = s c a' := by
+  unfold cat2Apply
+  apply foldl_preserves_at_pos
+  intro s' r hr
+  have hr_axis : r.axis = a := h_axis r hr
+  exact r.axis_local s' c a' (by rw [hr_axis]; exact hne)
+
+/-- **`processStratum` only modifies its own axis.** Cells `(c, a')` with
+`a' ≠ a` are preserved by `processStratum rs a`. -/
+theorem processStratum_only_modifies_axis (rs : StratifiedRuleSet C A) (a : A)
+    (s : State C A) (c : C) (a' : A) (hne : a' ≠ a) :
+    (processStratum rs a s) c a' = s c a' := by
+  unfold processStratum
+  rw [cat2Apply_axis_local (rs.cat2 a) a (rs.cat2_axis a) _ c a' hne]
+  rw [cat1Fixpoint_axis_local (rs.cat1 a) a (rs.cat1_axis a) _ c a' hne]
+
+/-! ## `processStratum` for read-independent axes commute
+
+Two `processStratum` invocations for distinct axes `a` and `b` commute when
+neither's rules read the other's axis. `processStratum_only_modifies_axis`
+guarantees they write disjoint cells, but in our current rule formalism
+(`MonotoneRule`, `NafRule`) the `apply` field is an arbitrary
+`State → State`, so a rule at axis `a` *could* read axis `b`'s state and
+thereby produce different outputs depending on whether `b` was processed
+first.
+
+We therefore commute under an explicit **read-independence** hypothesis:
+both `processStratum rs a` and `processStratum rs b` treat each other's
+axis-cells as "frame" — applying them to two states that differ only on
+the unread axis produces results that differ only on that axis.
+
+In a fully developed stratified Datalog formalism, read-independence
+between same-stratum axes would be a structural invariant of the rule
+set; here we expose it as a hypothesis on the operator pair. -/
+
+/-- A `processStratum` invocation is **read-independent** of axis `b` if
+applying it to two states that agree on every axis except `b` still
+produces results that agree on every axis except `b`. -/
+def processStratum_reads_independently (rs : StratifiedRuleSet C A) (a b : A) : Prop :=
+  ∀ s t : State C A, (∀ c x, x ≠ b → s c x = t c x) →
+    ∀ c x, x ≠ b → (processStratum rs a s) c x = (processStratum rs a t) c x
+
+/-- **`processStratum` for read-independent distinct axes commute.** Requires
+read-independence in both directions: `a`'s rules don't depend on axis `b`'s
+state, and vice versa. Under those hypotheses, swapping the two stratum
+processings is a no-op. -/
+theorem processStratum_commute (rs : StratifiedRuleSet C A) (a b : A) (hne : a ≠ b)
+    (h_a_indep_b : processStratum_reads_independently rs a b)
+    (h_b_indep_a : processStratum_reads_independently rs b a)
+    (s : State C A) :
+    processStratum rs a (processStratum rs b s) =
+    processStratum rs b (processStratum rs a s) := by
+  funext c x
+  by_cases hxa : x = a
+  · -- x = a. processStratum b doesn't write axis a, so by read-independence
+    -- of `a` from `b` the LHS reduces to processStratum a s, and the outer
+    -- processStratum b on the RHS doesn't modify axis a.
+    rw [hxa]
+    have h_agree_off_b : ∀ c' x', x' ≠ b →
+        (processStratum rs b s) c' x' = s c' x' :=
+      fun c' x' hxb' => processStratum_only_modifies_axis rs b s c' x' hxb'
+    have h_lhs_eq :
+        (processStratum rs a (processStratum rs b s)) c a =
+        (processStratum rs a s) c a :=
+      h_a_indep_b _ _ h_agree_off_b c a hne
+    rw [h_lhs_eq]
+    rw [processStratum_only_modifies_axis rs b (processStratum rs a s) c a hne]
+  · by_cases hxb : x = b
+    · rw [hxb]
+      have h_agree_off_a : ∀ c' x', x' ≠ a →
+          (processStratum rs a s) c' x' = s c' x' :=
+        fun c' x' hxa' => processStratum_only_modifies_axis rs a s c' x' hxa'
+      have h_rhs_eq :
+          (processStratum rs b (processStratum rs a s)) c b =
+          (processStratum rs b s) c b :=
+        h_b_indep_a _ _ h_agree_off_a c b (Ne.symm hne)
+      rw [h_rhs_eq]
+      rw [processStratum_only_modifies_axis rs a (processStratum rs b s) c b
+        (Ne.symm hne)]
+    · -- x ≠ a and x ≠ b. Both sides preserve cell (c, x) since neither
+      -- processStratum modifies it.
+      rw [processStratum_only_modifies_axis rs a (processStratum rs b s) c x hxa,
+          processStratum_only_modifies_axis rs b s c x hxb,
+          processStratum_only_modifies_axis rs b (processStratum rs a s) c x hxb,
+          processStratum_only_modifies_axis rs a s c x hxa]
+
 /-! ## Inflationarity of the stratified fixpoint
 
 `cat1Fixpoint`, `cat2Apply`, `processStratum`, and `stratifiedFixpoint`
