@@ -34,30 +34,56 @@ Three categories of rules in the stratified fixpoint computation:
 
 variable {C A : Type} [DecidableEq C] [DecidableEq A] [Fintype C] [Fintype A]
 
+variable {C A : Type} [DecidableEq C] [DecidableEq A] in
+/-- The frame property for a rule's `apply` function: the result depends only
+on cells at axes in `read_axes`. Two states that agree on every cell in those
+axis-columns produce equal applications.
+
+This is the structural read-locality condition. Combined with `axis_local`
+(write-locality), it captures the full read/write boundary of a rule. -/
+def FrameLocal (read_axes : Finset A) (apply : State C A → State C A) : Prop :=
+  ∀ s t : State C A,
+    (∀ c : C, ∀ b : A, b ∈ read_axes → s c b = t c b) → apply s = apply t
+
 /-- A Category 1 (positive propagation) rule.
-Monotone: only adds IS values, never removes information. -/
+Monotone: only adds IS values, never removes information.
+
+A rule has both a write-locality property (`axis_local`: only modifies its
+own `axis`) and a read-locality property (`frame_local`: depends only on
+cells in `read_axes`). Together these capture the read/write boundary that
+exists structurally at the Argon source level (a rule's trigger pattern
+names its read-set; its conclusion atom names its write-target). -/
 structure MonotoneRule (C A : Type) [DecidableEq C] [DecidableEq A] where
-  /-- The axis this rule operates on. -/
+  /-- The axis this rule operates on (writes to). -/
   axis : A
+  /-- The axes this rule may read from. Includes `axis` (rules read existing
+  values on their own axis to decide whether to fire). -/
+  read_axes : Finset A
   /-- Apply the rule to produce a new state. -/
   apply : State C A → State C A
   /-- The rule is monotone w.r.t. the information ordering. -/
   monotone : ∀ s t : State C A, s ≤ t → apply s ≤ apply t
-  /-- The rule only modifies its own axis. -/
+  /-- The rule only modifies its own axis (write-locality). -/
   axis_local : ∀ s : State C A, ∀ c : C, ∀ a : A,
     a ≠ axis → (apply s) c a = s c a
   /-- The rule only adds IS values (never produces NOT or changes existing values). -/
   only_adds_is : ∀ s : State C A, ∀ c : C,
     s c axis ≠ .can → (apply s) c axis = s c axis
+  /-- The rule's behavior depends only on cells at axes in `read_axes`
+  (read-locality). -/
+  frame_local : FrameLocal read_axes apply
 
 /-- A Category 2 (negation-as-failure) rule.
 Reads the completed Category 1 fixpoint and produces NOT values. -/
 structure NafRule (C A : Type) [DecidableEq C] [DecidableEq A] where
-  /-- The axis this rule operates on. -/
+  /-- The axis this rule operates on (writes to). -/
   axis : A
+  /-- The axes this rule may read from. Includes `axis` (NAF reads its own
+  axis to check for `.can` before flipping to `.not`). -/
+  read_axes : Finset A
   /-- Apply the rule given the completed Cat1 fixpoint state. -/
   apply : State C A → State C A
-  /-- The rule only modifies its own axis. -/
+  /-- The rule only modifies its own axis (write-locality). -/
   axis_local : ∀ s : State C A, ∀ c : C, ∀ a : A,
     a ≠ axis → (apply s) c a = s c a
   /-- The rule only changes CAN → NOT (never produces IS or changes existing values). -/
@@ -65,6 +91,9 @@ structure NafRule (C A : Type) [DecidableEq C] [DecidableEq A] where
     (apply s) c axis ≠ s c axis → s c axis = .can ∧ (apply s) c axis = .not
   /-- The rule is monotone: more information in → at least as much NOT out. -/
   monotone : ∀ s t : State C A, s ≤ t → apply s ≤ apply t
+  /-- The rule's behavior depends only on cells at axes in `read_axes`
+  (read-locality). -/
+  frame_local : FrameLocal read_axes apply
 
 /-- A diagnostic produced by a constraint check. -/
 structure Diagnostic where
@@ -80,9 +109,18 @@ structure ConstraintCheck (C A : Type) [DecidableEq C] [DecidableEq A]
 
 /-- A collection of rules organized by axis, respecting stratification.
 
-For a given stratification, rules at stratum k may only read axes at strata
-< k (or their own axis). This is enforced by the `reads_lower_strata`
-property. -/
+The stratification consistency invariants tie each rule's declared
+`read_axes` to the stratification:
+- Cat1 rules at axis `a` may read any axis at stratum `≤ strat a`
+  (including own axis at the same stratum).
+- Cat2 rules at axis `a` may read own axis (for the `.can` check) and any
+  axis at stratum strictly below `strat a`. NAF over same-stratum axes
+  would be ill-stratified.
+
+These invariants are exactly the structural conditions of stratified
+Datalog (Apt-Blair-Walker 1988). They make `processStratum_commute`
+discharge-able for any pair of distinct same-stratum axes, which in turn
+gives `stratified_fixpoint_unique`. -/
 structure StratifiedRuleSet (C A : Type) [DecidableEq C] [DecidableEq A]
     [Fintype C] [Fintype A] where
   /-- The stratification of axes. -/
@@ -97,6 +135,12 @@ structure StratifiedRuleSet (C A : Type) [DecidableEq C] [DecidableEq A]
   cat1_axis : ∀ a, ∀ r ∈ cat1 a, r.axis = a
   /-- All Cat2 rules for axis `a` have `axis = a`. -/
   cat2_axis : ∀ a, ∀ r ∈ cat2 a, r.axis = a
+  /-- Cat1 rules at axis `a` only read axes at strata `≤ strat a`. -/
+  cat1_strat_consistent : ∀ a, ∀ r ∈ cat1 a, ∀ b ∈ r.read_axes,
+    strat.strat b ≤ strat.strat a
+  /-- Cat2 rules at axis `a` only read own axis or axes at strata `< strat a`. -/
+  cat2_strat_consistent : ∀ a, ∀ r ∈ cat2 a, ∀ b ∈ r.read_axes,
+    b = a ∨ strat.strat b < strat.strat a
 
 /-- Compose a list of monotone rules into a single state transformation.
 Apply each rule in sequence. -/

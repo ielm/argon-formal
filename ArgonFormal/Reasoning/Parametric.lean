@@ -143,6 +143,19 @@ structure ParametricRuleSet (C A : Type) [DecidableEq C] [DecidableEq A] [Fintyp
   cat1_axis : ∀ a, ∀ r ∈ cat1 a, r.axis = a
   /-- Concrete Cat2 rules for axis `a` target axis `a`. -/
   cat2_axis : ∀ a, ∀ r ∈ cat2 a, r.axis = a
+  /-- Concrete Cat1 rules at axis `a` only read axes at strata `≤ strat a`. -/
+  cat1_strat_consistent : ∀ a, ∀ r ∈ cat1 a, ∀ b ∈ r.read_axes,
+    strat.strat b ≤ strat.strat a
+  /-- Concrete Cat2 rules at axis `a` only read own axis or strata `< strat a`. -/
+  cat2_strat_consistent : ∀ a, ∀ r ∈ cat2 a, ∀ b ∈ r.read_axes,
+    b = a ∨ strat.strat b < strat.strat a
+  /-- Parametric Cat1 rules: every instantiation respects stratification. -/
+  pcat1_strat_consistent : ∀ pr ∈ pcat1, ∀ (a : A) (h : pr.bound a),
+    ∀ b ∈ (pr.instantiate a h).read_axes, strat.strat b ≤ strat.strat a
+  /-- Parametric Cat2 rules: every instantiation respects stratification. -/
+  pcat2_strat_consistent : ∀ pr ∈ pcat2, ∀ (a : A) (h : pr.bound a),
+    ∀ b ∈ (pr.instantiate a h).read_axes,
+      b = a ∨ strat.strat b < strat.strat a
 
 /-! ## Expansion (Monomorphization) -/
 
@@ -194,6 +207,41 @@ def ParametricRuleSet.expand (prs : ParametricRuleSet C A) : StratifiedRuleSet C
     cases hr with
     | inl h => exact prs.cat2_axis a r h
     | inr h => exact expandCat2ForAxis_axis prs.pcat2 a r h
+  cat1_strat_consistent := by
+    intro a r hr b hb
+    rw [List.mem_append] at hr
+    cases hr with
+    | inl h => exact prs.cat1_strat_consistent a r h b hb
+    | inr h =>
+      -- r came from expanding some parametric rule pr at axis a.
+      simp only [expandCat1ForAxis, List.mem_filterMap] at h
+      obtain ⟨pr, hpr, heq⟩ := h
+      unfold ParametricMonotoneRule.tryInstantiate at heq
+      revert heq
+      cases hbnd : pr.bound_decidable a with
+      | isTrue hb' =>
+        intro heq
+        injection heq with heq
+        rw [← heq] at hb
+        exact prs.pcat1_strat_consistent pr hpr a hb' b hb
+      | isFalse _ => intro heq; exact absurd heq (by simp)
+  cat2_strat_consistent := by
+    intro a r hr b hb
+    rw [List.mem_append] at hr
+    cases hr with
+    | inl h => exact prs.cat2_strat_consistent a r h b hb
+    | inr h =>
+      simp only [expandCat2ForAxis, List.mem_filterMap] at h
+      obtain ⟨pr, hpr, heq⟩ := h
+      unfold ParametricNafRule.tryInstantiate at heq
+      revert heq
+      cases hbnd : pr.bound_decidable a with
+      | isTrue hb' =>
+        intro heq
+        injection heq with heq
+        rw [← heq] at hb
+        exact prs.pcat2_strat_consistent pr hpr a hb' b hb
+      | isFalse _ => intro heq; exact absurd heq (by simp)
 
 /-! ## Parametric Fixpoint -/
 
