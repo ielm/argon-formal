@@ -23,7 +23,7 @@ theorem abox_unchanged [BotLocality CN RN]
 theorem domain_unchanged [BotLocality CN RN]
     (M : LocalityModule CN RN) (O : Ontology CN RN IN) :
     (⟨M.module, O.abox⟩ : Ontology CN RN IN).domain = O.domain := by
-  simp [Ontology.domain, abox_unchanged]
+  simp [Ontology.domain]
 
 /-! ## Main Theorem -/
 

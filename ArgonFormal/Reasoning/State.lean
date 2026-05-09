@@ -119,7 +119,7 @@ theorem numCan_lt_of_lt_ne {s t : State C A} (hle : s ≤ t) (hne : s ≠ t) :
   -- From s ≠ t, ∃ c a, s c a ≠ t c a; combined with s ≤ t, forces s c a = .can.
   have h_diff : ∃ c a, s c a ≠ t c a := by
     by_contra hall
-    push_neg at hall
+    push Not at hall
     apply hne
     funext c a
     exact hall c a

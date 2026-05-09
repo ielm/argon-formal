@@ -8,6 +8,24 @@ pp.unicode.fun = true # pretty-prints `fun a ↦ b`
 relaxedAutoImplicit = false
 weak.linter.mathlibStandardSet = true
 maxSynthPendingDepth = 3
+# Suppress noisy linters that flag unused instance hypotheses on
+# theorems whose proofs (but not types) use the instances. The standard
+# variable-block pattern declares [DecidableEq C] [DecidableEq A]
+# [Fintype C] [Fintype A] for the file; many theorems' types don't
+# mention all four, but their proofs route through them. Disabling at
+# the project level matches Mathlib practice for Fintype-heavy files.
+weak.linter.unusedFintypeInType = false
+weak.linter.unusedDecidableInType = false
+weak.linter.unusedSectionVars = false
+# Style linters that are too aggressive for this codebase. The `show`
+# tactic is used legitimately to expand `set` bindings and force
+# definitional unfolding for subsequent rewrites; the long-line cap is
+# routinely exceeded by stratified-Datalog signatures with many bound
+# axes; flexible `simp at h` usage is fine when the hypothesis is then
+# discarded or fully consumed.
+weak.linter.style.show = false
+weak.linter.style.longLine = false
+weak.linter.flexible = false
 
 [[require]]
 name = "mathlib"

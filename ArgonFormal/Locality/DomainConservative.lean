@@ -23,7 +23,7 @@ variable {CN RN IN : Type}
     in closed Σ-concepts). This is the locality fixpoint
     restricted to closed concepts. -/
 def cwaInfluenceCone [BotLocality CN RN]
-    (M : LocalityModule CN RN) (ω : WorldAssumptionMap CN)
+    (M : LocalityModule CN RN) (_ω : WorldAssumptionMap CN)
     : Finset CN :=
   -- The fixpoint signature already includes all concepts
   -- whose axioms could affect Σ-concept entailments.
@@ -110,7 +110,7 @@ theorem domain_conservative_strong_cwa
     (M : LocalityModule CN RN)
     (O : Ontology CN RN IN)
     (ω : WorldAssumptionMap CN)
-    (h_ce : conservativeExtension M O)
+    (_h_ce : conservativeExtension M O)
     -- The domain-conservative ABox preserves entailment:
     -- same TBox module, richer ABox than Σ-scoped but
     -- subset of full ABox.

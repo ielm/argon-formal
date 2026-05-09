@@ -66,9 +66,9 @@ theorem acyclicity_necessary_for_uniqueness :
     -- The dependency graph has a cycle
     (∃ a b : A, dep a b ∧ dep b a) ∧
     -- There exist rules and two orderings that give different results
-    (∃ (rules_cat1 : A → List (MonotoneRule C A))
-       (rules_cat2 : A → List (NafRule C A))
-       (order1 order2 : List A),
+    (∃ (_rules_cat1 : A → List (MonotoneRule C A))
+       (_rules_cat2 : A → List (NafRule C A))
+       (_order1 _order2 : List A),
       True
     ) := by
   exact ⟨OneConcept, TwoAxes, inferInstance, inferInstance, inferInstance, inferInstance,
@@ -86,13 +86,13 @@ theorem cycle_causes_order_dependence :
       processYthenX .c .X ≠ processXthenY .c .X := by
   -- Define the rule functions
   let cat1_X : State OneConcept TwoAxes → State OneConcept TwoAxes :=
-    fun s c a => match a with
-      | .X => if s c .Y = .not then .is else s c a
-      | .Y => s c a
+    fun s _c a => match a with
+      | .X => if s _c .Y = .not then .is else s _c a
+      | .Y => s _c a
   let cat2_Y : State OneConcept TwoAxes → State OneConcept TwoAxes :=
-    fun s c a => match a with
-      | .Y => if s c .X ≠ .is ∧ s c .Y = .can then .not else s c a
-      | .X => s c a
+    fun s _c a => match a with
+      | .Y => if s _c .X ≠ .is ∧ s _c .Y = .can then .not else s _c a
+      | .X => s _c a
   -- Order Y,X: apply cat2_Y first (Y's Cat2), then cat1_X (X's Cat1)
   let after_YX := cat1_X (cat2_Y State.initial)
   -- Order X,Y: apply cat1_X first (X's Cat1), then cat2_Y (Y's Cat2)

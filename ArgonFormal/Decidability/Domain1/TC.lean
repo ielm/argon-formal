@@ -176,7 +176,7 @@ private theorem exists_fixpoint_within_card (s : Finset C) :
   -- pair is strict, giving `Fintype.card C + 1` strict cardinality
   -- increases — contradicting the bound `card ≤ Fintype.card C`.
   by_contra h_none
-  push_neg at h_none
+  push Not at h_none
   -- h_none: ∀ k ≤ Fintype.card C, iterReachable s (k+1) ≠ iterReachable s k
   -- Combined with `iterReachable_mono`, we get strict subset at each step.
   -- Card chain: c_0 ≤ c_1 ≤ ... with c_i < c_{i+1} for i < Fintype.card C + 1.

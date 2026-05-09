@@ -24,7 +24,7 @@ def StratumIndex (CN : Type) := CN → Nat
     concepts at strata < k. -/
 def validStratumIndex
     (strat : StratumIndex CN)
-    (ω : WorldAssumptionMap CN)
+    (_ω : WorldAssumptionMap CN)
     -- posDep c d means: concept c has a rule with d
     -- in the positive body
     (posDep : CN → CN → Prop)
@@ -70,7 +70,7 @@ theorem chained_cwa_conservative
     (O : Ontology CN RN IN)
     (ω : WorldAssumptionMap CN)
     (strat : StratumIndex CN)
-    (h_ce : conservativeExtension M O)
+    (_h_ce : conservativeExtension M O)
     -- Positive entailment at each stratum is preserved
     -- (from P4 of locality modules)
     (h_pos_preserved : ∀ c a,

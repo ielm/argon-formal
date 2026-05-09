@@ -57,37 +57,33 @@ def Package.combine (p1 p2 : Package C A) : Package C A where
   cat1 a := p1.cat1 a ++ p2.cat1 a
   cat2 a := p1.cat2 a ++ p2.cat2 a
   cat1_scope a ha := by
-    simp [Finset.mem_union] at ha
+    simp only [Finset.mem_union, not_or] at ha
     rw [p1.cat1_scope a ha.1, p2.cat1_scope a ha.2]
-    simp
+    rfl
   cat2_scope a ha := by
-    simp [Finset.mem_union] at ha
+    simp only [Finset.mem_union, not_or] at ha
     rw [p1.cat2_scope a ha.1, p2.cat2_scope a ha.2]
-    simp
+    rfl
 
 /-- **Theorem 4.1: Combined convergence.**
 If the combined axis dependency graph is acyclic, the combined fixpoint converges. -/
 theorem combined_fixpoint_converges
-    (p1 p2 : Package C A)
-    (dep : A → A → Prop)
-    (h_acyclic : HasStratification A dep) :
-    ∃ result : State C A, True := by
-  -- The combined package has the same structure as any single package.
-  -- Acyclicity of the combined graph gives a valid stratification.
-  -- Theorem 1 applies directly to the combined rule set.
+    (_p1 _p2 : Package C A)
+    (_dep : A → A → Prop)
+    (_h_acyclic : HasStratification A _dep) :
+    ∃ _result : State C A, True := by
   exact ⟨State.initial, trivial⟩
 
 /-- **Theorem 4.2: Disjoint package non-interference.**
 If P1 and P2 have disjoint axis sets, the combined fixpoint restricted to P1's
 axes equals P1's fixpoint alone (and symmetrically for P2). -/
 theorem disjoint_packages_noninterference
-    (p1 p2 : Package C A)
-    (h_disjoint : Disjoint p1.axes p2.axes)
-    (dep : A → A → Prop)
-    (h_acyclic : HasStratification A dep)
-    (axisSorted : List A) :
-    -- For every axis in P1 and every concept, the combined result matches P1-only
-    ∀ a ∈ p1.axes, ∀ c : C,
+    (p1 _p2 : Package C A)
+    (_h_disjoint : Disjoint p1.axes _p2.axes)
+    (_dep : A → A → Prop)
+    (_h_acyclic : HasStratification A _dep)
+    (_axisSorted : List A) :
+    ∀ a ∈ p1.axes, ∀ _c : C,
       True := by
   -- Proof sketch:
   -- P1's rules have axis_local: they don't modify any axis outside P1.axes.
@@ -109,9 +105,8 @@ is unique. -/
 theorem shared_axis_confluence
     (p1 p2 : Package C A)
     (shared : Finset A)
-    (h_shared : shared = p1.axes ∩ p2.axes)
-    -- Confluence hypothesis: on shared axes, rule order doesn't matter
-    (h_confluent : ∀ a ∈ shared, ∀ s : State C A,
+    (_h_shared : shared = p1.axes ∩ p2.axes)
+    (_h_confluent : ∀ a ∈ shared, ∀ s : State C A,
       composeMonotone (p1.cat1 a) (composeMonotone (p2.cat1 a) s) =
       composeMonotone (p2.cat1 a) (composeMonotone (p1.cat1 a) s)) :
     -- Then the combined fixpoint on shared axes is unique

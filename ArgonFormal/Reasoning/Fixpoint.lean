@@ -534,7 +534,7 @@ theorem isTopoSort_iff_pairwise (sorted : List A) (strat : Stratification A) :
     exact absurd this (asymm hij)
   · intro h i j h_strat_lt
     by_contra h_pos
-    push_neg at h_pos
+    push Not at h_pos
     rcases lt_or_eq_of_le h_pos with h_lt | h_eq
     · have := h j i h_lt
       exact absurd h_strat_lt (not_lt.mpr this)

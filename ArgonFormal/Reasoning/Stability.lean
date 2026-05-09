@@ -113,11 +113,11 @@ but not both (since IS and NOT are incomparable). -/
 theorem can_resolves_uniquely
     (c : C) (a : A)
     (s_orig : State C A)
-    (h_can : s_orig c a = .can)
+    (_h_can : s_orig c a = .can)
     -- Two consistent extensions that both refine s_orig
     (s_ext1 s_ext2 : State C A)
-    (h_ext1 : s_orig ≤ s_ext1)
-    (h_ext2 : s_orig ≤ s_ext2) :
+    (_h_ext1 : s_orig ≤ s_ext1)
+    (_h_ext2 : s_orig ≤ s_ext2) :
     -- If ext1 says IS and ext2 says NOT, they're incompatible (no common refinement)
     s_ext1 c a = .is → s_ext2 c a = .not →
     ¬∃ s_merged : State C A, s_ext1 ≤ s_merged ∧ s_ext2 ≤ s_merged := by
