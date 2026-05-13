@@ -252,38 +252,63 @@ theorem d1EvalBound {C A : Type} [Fintype C] [DecidableEq C]
       d1Size φ * (Fintype.card C + 1) ^ d1QuantifierDepth φ :=
   d1EvalCost_le (Fintype.card C) φ
 
-/-- Complexity class enumeration for stating bounds. -/
-inductive ComplexityClass where
-  /-- Polynomial time -/
-  | ptime    : ComplexityClass
-  /-- Nondeterministic polynomial time -/
-  | np       : ComplexityClass
-  /-- Doubly exponential time -/
-  | exptime2 : ComplexityClass
-  deriving Repr, DecidableEq
+/-! ## Theorem 4 (cont.): polynomial bound for fixed predicates
 
-/-- Domain 1 is in PTime (for fixed predicate depth). -/
-theorem d1Complexity : ComplexityClass.ptime = .ptime := rfl
+The textbook "Domain 1 is in PTime" claim, in concrete form: for any
+fixed predicate, evaluation cost is bounded by some polynomial in `n`.
+This follows from `d1EvalCost_le` by reading off coefficient and degree. -/
 
-/-- **Axiom: QF-LIA is NP-complete.**
-    Presburger arithmetic restricted to quantifier-free formulas. -/
-axiom qfliaNP : ComplexityClass.np = .np
+/-- **Domain 1 polynomial bound.** For any fixed Domain 1 predicate `φ`,
+there exist a coefficient and a degree such that the evaluation cost is
+bounded by `coeff * (n + 1) ^ deg` for every concept-universe size `n`.
 
-/-- **Axiom: GNFO is 2-EXPTIME-complete.**
-    Bárány, ten Cate & Segoufin (2015). -/
-axiom gnfo2ExpTime : ComplexityClass.exptime2 = .exptime2
+The witness coefficient is `d1Size φ` and the witness degree is
+`d1QuantifierDepth φ` — both fixed once `φ` is fixed. -/
+theorem d1_polynomial_bound {C A : Type} (φ : D1Pred C A) :
+    ∃ coeff deg : Nat, ∀ n : Nat, d1EvalCost n φ ≤ coeff * (n + 1) ^ deg :=
+  ⟨d1Size φ, d1QuantifierDepth φ, fun n => d1EvalCost_le n φ⟩
 
-/-- **Theorem 4: Full Fragment Complexity.**
+/-! ## Theorem 4 (full fragment): decidability
 
-The full Argon refinement predicate fragment is in 2-EXPTIME,
-dominated by the GNFO component. Domain 1 (PTime) and QF-LIA (NP)
-do not increase the bound — 2-EXPTIME subsumes both.
+The "full fragment complexity" claim consists of two parts:
 
-| Component     | Class     | Dominance |
-|---------------|-----------|-----------|
-| Domain 1      | PTime     | ≤ NP ≤ 2-EXPTIME |
-| QF-LIA        | NP        | ≤ 2-EXPTIME |
-| GNFO          | 2-EXPTIME | = 2-EXPTIME |
-| Full fragment  | 2-EXPTIME | GNFO dominates | -/
-theorem fullFragmentComplexity :
-    ComplexityClass.exptime2 = .exptime2 := rfl
+1. **Decidability:** every mixed predicate is decidable. This is proved
+   in `Decidability/CrossDomain/Decidability.lean` as `mixedDecidable`,
+   reducing mixed evaluation to the staged form (Domain 1 atoms first,
+   then Domain 2 atoms over the resulting constants).
+
+2. **Complexity-class assignment** (QF-LIA = NP, GNFO = 2-EXPTIME, full
+   fragment = 2-EXPTIME via dominance): this is *external*, cited from
+   primary sources (Ginsburg-Spanier 1966 for QF-LIA; Bárány-ten Cate-
+   Segoufin 2015 for GNFO). A Lean expression of these classifications
+   would require a Turing-machine formalization of the cost model for
+   `d2Sat` — which is opaque by design (the satisfaction relation is
+   axiomatic). The mechanical content we *can* state is the
+   decidability witness in `Decidability/Domain2/Theories.lean`
+   (`d2CombinedDecidable`). The complexity assignment lives in those
+   cited papers and is preserved in our published proof obligations.
+
+We therefore expose `fullFragmentDecidable` as the mechanically-proved
+component of "full fragment complexity" and document the externality
+of the rest. -/
+
+/-- **Theorem 4 (full fragment decidable).** Every mixed predicate is
+decidable, given the external decidability witnesses for the Domain 2
+fragments. A direct restatement of `mixedDecidable` as a `Decidable`
+instance constructor. -/
+noncomputable def fullFragmentDecidable {C A : Type} [Fintype C] [DecidableEq C]
+    [Fintype A] [DecidableEq A]
+    (G : TypeGraph C A) (c : C) (φ : MixedPred C A) :
+    Decidable (mixedEval G c φ) :=
+  mixedDecidable G c φ
+
+/-- **Theorem 4 (full fragment decidable, Prop form).** The proposition
+"the mixed-predicate evaluation `mixedEval G c φ` is decidable" holds —
+extracting the existence of a decision procedure as a `Prop` so it can
+be referenced in places where `Decidable` (a `Type`) is not directly
+usable. -/
+theorem fullFragmentDecidable_prop {C A : Type} [Fintype C] [DecidableEq C]
+    [Fintype A] [DecidableEq A]
+    (G : TypeGraph C A) (c : C) (φ : MixedPred C A) :
+    Nonempty (Decidable (mixedEval G c φ)) :=
+  ⟨mixedDecidable G c φ⟩

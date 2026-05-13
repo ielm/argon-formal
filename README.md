@@ -97,7 +97,7 @@ Decidability of Argon's refinement-predicate fragment.
 - `Domain2/Decidability.lean` — Theorem 2: Domain 2 decidability.
 - `CrossDomain/Staging.lean` — staging semantics; `stage_correct` (proven via structural induction on `MixedPred`).
 - `CrossDomain/Decidability.lean` — Theorem 3: cross-domain decidability via staging + the `stagedDecidable` recursor.
-- `Complexity/Bounds.lean` — per-fragment complexity bounds (axiomatic; cited).
+- `Complexity/Bounds.lean` — Theorem 4a (Domain 1 PTime bound): explicit cost model (`d1EvalCost`) + size measure (`d1Size`) with the bound `d1EvalCost n φ ≤ d1Size φ * (n+1)^(d1QuantifierDepth φ)` proved by structural induction (`d1EvalCost_le`). Polynomial-bound corollary (`d1_polynomial_bound`). Theorem 4 (full fragment decidable, via `mixedDecidable`). Complexity classifications for Domain 2 fragments are external (see Domain2/Theories.lean).
 
 ### `ArgonFormal.Locality`
 
@@ -143,7 +143,7 @@ Future RFDs land as new top-level subdirectories or files within existing areas:
 
 ## Axioms used
 
-Six axioms total — all external mathematical facts. Zero Argon-specific
+Four axioms total — all external mathematical facts. Zero Argon-specific
 axioms; every theorem about the stratified fixpoint computation, package
 composition, narrowing soundness, and parametric expansion depends only
 on Lean's foundational axioms (`propext`, `Classical.choice`, `Quot.sound`).
@@ -151,12 +151,17 @@ on Lean's foundational axioms (`propext`, `Classical.choice`, `Quot.sound`).
 Run `#print axioms <theorem>` from any downstream theorem to inspect
 what it actually depends on.
 
-### External mathematical facts (6 axioms)
+### External mathematical facts (4 axioms)
 
 Results from external systems / well-known classical theorems we depend on but don't reprove.
 
 - `Decidability/Domain2/Theories.lean` — `d2Sat`, `qfliaDecidable`, `gnfoDecidable`, `d2CombinedDecidable` (4 axioms): the satisfaction relation for Domain 2 predicates and the decidability witnesses for QF-LIA and GNFO fragments. Decidability is classical: Ginsburg-Spanier 1966 for QF-LIA; Bárány-ten Cate-Segoufin 2015 for GNFO.
-- `Decidability/Complexity/Bounds.lean` — `qfliaNP`, `gnfo2ExpTime` (2 axioms): complexity classifications cited from primary sources.
+
+(The complexity classifications "QF-LIA is NP-complete" and "GNFO is
+2-EXPTIME-complete" are cited from those primary sources but are not
+mechanically encoded — a precise Lean expression would require a
+Turing-machine cost model for the opaque `d2Sat` relation. The
+mechanically-proved component is the decidability witness above.)
 
 ### Closed Argon obligations
 
