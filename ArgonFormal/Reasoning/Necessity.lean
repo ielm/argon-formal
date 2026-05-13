@@ -56,47 +56,59 @@ def orderXY : List TwoAxes := [.X, .Y]
 
 variable {C A : Type} [DecidableEq C] [DecidableEq A] [Fintype C] [Fintype A]
 
+/-- The Cat1 rule body for axis X used in the counterexample:
+"if c.Y = NOT then c.X := IS, else preserve."
+
+(Stated as a `State → State` operator rather than a `MonotoneRule` because
+`MonotoneRule`'s `frame_local` field assumes strict stratification — which
+is precisely what fails here. The point of the counterexample is that
+without stratification, the rule-level operator does not commute with the
+NAF rule's operator below.) -/
+def cat1_X_op : State OneConcept TwoAxes → State OneConcept TwoAxes :=
+  fun s cx a => match a with
+    | .X => if s cx .Y = .not then .is else s cx a
+    | .Y => s cx a
+
+/-- The Cat2 (NAF) rule body for axis Y used in the counterexample:
+"if c.X ≠ IS and c.Y = CAN then c.Y := NOT." -/
+def cat2_Y_op : State OneConcept TwoAxes → State OneConcept TwoAxes :=
+  fun s cx a => match a with
+    | .Y => if s cx .X ≠ .is ∧ s cx .Y = .can then .not else s cx a
+    | .X => s cx a
+
+/-- **Counterexample core:** the two operators do not commute on
+`State.initial`. Order `Y, X` (apply `cat2_Y` then `cat1_X`) sets
+`X = .is`; order `X, Y` (apply `cat1_X` then `cat2_Y`) leaves `X = .can`. -/
+theorem cycle_causes_order_dependence :
+    cat1_X_op (cat2_Y_op State.initial) ≠ cat2_Y_op (cat1_X_op State.initial) := by
+  intro h_eq
+  have h_apply := congrFun (congrFun h_eq .c) .X
+  -- LHS: cat1_X (cat2_Y init) .c .X
+  -- cat2_Y init: at (.c, .Y), .X ≠ .is and .Y = .can → .not. So cat2_Y init .c .Y = .not.
+  -- cat1_X (cat2_Y init) .c .X: .Y = .not → .is. So LHS = .is.
+  -- RHS: cat2_Y (cat1_X init) .c .X
+  -- cat1_X init .c .X: .Y = .can ≠ .not → preserve. cat1_X init .c .X = .can.
+  -- cat2_Y (cat1_X init) .c .X: axis .X case preserves. RHS = .can.
+  -- .is ≠ .can.
+  exact absurd h_apply (by decide)
+
 /-- **Theorem 2: Acyclicity is Necessary for Uniqueness.**
 
-If the axis dependency graph contains a cycle, there exists a concept set,
-a rule set, and two processing orders that produce different fixpoint results. -/
+If the axis dependency graph contains a cycle, there exists a concept
+type, an axis type, a cyclic dependency relation, and two state
+transformations that fail to commute. Per-axis processing in either
+order would then produce different results, breaking uniqueness.
+
+The witness uses `OneConcept` × `TwoAxes` × `cyclicDep` × `cat1_X_op` ×
+`cat2_Y_op`, with `State.initial` as the differentiating starting state
+(see `cycle_causes_order_dependence`). -/
 theorem acyclicity_necessary_for_uniqueness :
     ∃ (C A : Type) (_ : DecidableEq C) (_ : DecidableEq A) (_ : Fintype C) (_ : Fintype A),
     ∃ (dep : A → A → Prop),
-    -- The dependency graph has a cycle
     (∃ a b : A, dep a b ∧ dep b a) ∧
-    -- There exist rules and two orderings that give different results
-    (∃ (_rules_cat1 : A → List (MonotoneRule C A))
-       (_rules_cat2 : A → List (NafRule C A))
-       (_order1 _order2 : List A),
-      True
-    ) := by
-  exact ⟨OneConcept, TwoAxes, inferInstance, inferInstance, inferInstance, inferInstance,
-         cyclicDep,
-         ⟨.X, .Y, trivial, trivial⟩,
-         ⟨fun _ => [], fun _ => [], orderYX, orderXY, trivial⟩⟩
-
-/-- The concrete counterexample: processing order Y,X vs X,Y produces different results
-    for axis X when there's a Cat1-Cat2 dependency cycle.
-
-    Cat1 rule for X: if c.Y = NOT then c.X := IS
-    Cat2 rule for Y: if c.X ≠ IS and c.Y = CAN then c.Y := NOT -/
-theorem cycle_causes_order_dependence :
-    ∃ (processYthenX processXthenY : State OneConcept TwoAxes),
-      processYthenX .c .X ≠ processXthenY .c .X := by
-  -- Define the rule functions
-  let cat1_X : State OneConcept TwoAxes → State OneConcept TwoAxes :=
-    fun s _c a => match a with
-      | .X => if s _c .Y = .not then .is else s _c a
-      | .Y => s _c a
-  let cat2_Y : State OneConcept TwoAxes → State OneConcept TwoAxes :=
-    fun s _c a => match a with
-      | .Y => if s _c .X ≠ .is ∧ s _c .Y = .can then .not else s _c a
-      | .X => s _c a
-  -- Order Y,X: apply cat2_Y first (Y's Cat2), then cat1_X (X's Cat1)
-  let after_YX := cat1_X (cat2_Y State.initial)
-  -- Order X,Y: apply cat1_X first (X's Cat1), then cat2_Y (Y's Cat2)
-  let after_XY := cat2_Y (cat1_X State.initial)
-  -- after_YX .c .X = IS (Cat2 set Y=NOT, then Cat1 saw Y=NOT and set X=IS)
-  -- after_XY .c .X = CAN (Cat1 saw Y=CAN≠NOT, didn't fire; Cat2 set Y=NOT but X already processed)
-  exact ⟨after_YX, after_XY, by decide⟩
+    ∃ (op1 op2 : State C A → State C A) (s : State C A),
+      op1 (op2 s) ≠ op2 (op1 s) :=
+  ⟨OneConcept, TwoAxes, inferInstance, inferInstance, inferInstance, inferInstance,
+   cyclicDep,
+   ⟨.X, .Y, trivial, trivial⟩,
+   cat1_X_op, cat2_Y_op, State.initial, cycle_causes_order_dependence⟩

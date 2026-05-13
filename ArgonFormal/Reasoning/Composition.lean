@@ -65,50 +65,81 @@ def Package.combine (p1 p2 : Package C A) : Package C A where
     rw [p1.cat2_scope a ha.1, p2.cat2_scope a ha.2]
     rfl
 
-/-- **Theorem 4.1: Combined convergence.**
-If the combined axis dependency graph is acyclic, the combined fixpoint converges. -/
-theorem combined_fixpoint_converges
-    (_p1 _p2 : Package C A)
-    (_dep : A → A → Prop)
-    (_h_acyclic : HasStratification A _dep) :
-    ∃ _result : State C A, True := by
-  exact ⟨State.initial, trivial⟩
+/-! ## Theorem 4: Package composition
+
+The three theorems below characterize how `Package.combine` behaves at
+the rule-list level. All downstream fixpoint properties of the combined
+package follow from the corresponding `StratifiedRuleSet` theorems
+(Theorems 1.1–1.3, 5) once the combined package is paired with a
+stratification — i.e. these are the *purely structural* composition
+results, separating the package-algebra layer from the stratification
+layer. -/
+
+/-- **Theorem 4.1: Combined rule lists.**
+The Category 1 and Category 2 rule lists of `p1.combine p2` are
+respectively the concatenations `p1.cat1 a ++ p2.cat1 a` and
+`p1.cat2 a ++ p2.cat2 a`. -/
+theorem combine_cat1 (p1 p2 : Package C A) (a : A) :
+    (p1.combine p2).cat1 a = p1.cat1 a ++ p2.cat1 a := rfl
+
+theorem combine_cat2 (p1 p2 : Package C A) (a : A) :
+    (p1.combine p2).cat2 a = p1.cat2 a ++ p2.cat2 a := rfl
+
+/-- **Theorem 4.1 (corollary): Combined `composeMonotone` factors.**
+For any axis `a`, applying the combined-package monotone composition to
+state `s` is the same as applying `p1`'s composition followed by `p2`'s:
+`composeMonotone ((p1.combine p2).cat1 a) s
+  = composeMonotone (p2.cat1 a) (composeMonotone (p1.cat1 a) s)`.
+
+This is the convergence-preserving structural identity: the combined
+package's per-axis Cat1 evaluation factors through each package's. -/
+theorem combine_composeMonotone (p1 p2 : Package C A) (a : A) (s : State C A) :
+    composeMonotone ((p1.combine p2).cat1 a) s =
+    composeMonotone (p2.cat1 a) (composeMonotone (p1.cat1 a) s) := by
+  unfold composeMonotone
+  rw [combine_cat1, List.foldl_append]
 
 /-- **Theorem 4.2: Disjoint package non-interference.**
-If P1 and P2 have disjoint axis sets, the combined fixpoint restricted to P1's
-axes equals P1's fixpoint alone (and symmetrically for P2). -/
-theorem disjoint_packages_noninterference
-    (p1 _p2 : Package C A)
-    (_h_disjoint : Disjoint p1.axes _p2.axes)
-    (_dep : A → A → Prop)
-    (_h_acyclic : HasStratification A _dep)
-    (_axisSorted : List A) :
-    ∀ a ∈ p1.axes, ∀ _c : C,
-      True := by
-  -- Proof sketch:
-  -- P1's rules have axis_local: they don't modify any axis outside P1.axes.
-  -- P2's rules have axis_local: they don't modify any axis outside P2.axes.
-  -- Since p1.axes and p2.axes are disjoint (h_disjoint):
-  --   - P2's rules don't modify any axis in P1.axes
-  --   - P1's rules don't modify any axis in P2.axes
-  -- Therefore on P1's axes, the combined fixpoint computation sees:
-  --   - P1's rules producing the same IS/NOT values as P1-only
-  --   - P2's rules producing no changes (axis_local + disjointness)
-  -- The result on P1's axes is identical to P1-only.
-  intro a _ c
-  trivial
+For an axis `a` not in `p2`'s scope, the combined package's Cat1 and Cat2
+rule lists for `a` reduce to `p1`'s. (Symmetric statement holds for axes
+not in `p1`'s scope.)
 
-/-- **Theorem 4.3: Shared axis confluence (additional hypothesis).**
-For shared axes, if P1's rules and P2's rules are confluent (applying P1 then P2
-gives the same result as P2 then P1), then the combined fixpoint on shared axes
-is unique. -/
+When `p1.axes` and `p2.axes` are disjoint and `a ∈ p1.axes`, this gives
+`(p1.combine p2).cat1 a = p1.cat1 a`: combining does not introduce P2's
+rules at P1's axes, because P2's rules are scoped to P2's axes only. -/
+theorem disjoint_packages_noninterference_cat1
+    (p1 p2 : Package C A) (a : A) (h_not_in_p2 : a ∉ p2.axes) :
+    (p1.combine p2).cat1 a = p1.cat1 a := by
+  rw [combine_cat1, p2.cat1_scope a h_not_in_p2, List.append_nil]
+
+theorem disjoint_packages_noninterference_cat2
+    (p1 p2 : Package C A) (a : A) (h_not_in_p2 : a ∉ p2.axes) :
+    (p1.combine p2).cat2 a = p1.cat2 a := by
+  rw [combine_cat2, p2.cat2_scope a h_not_in_p2, List.append_nil]
+
+/-- **Theorem 4.2 (corollary): On disjoint scopes the combined Cat1
+composition collapses to the owning package's composition.** -/
+theorem disjoint_composeMonotone_eq_p1
+    (p1 p2 : Package C A) (a : A) (h_not_in_p2 : a ∉ p2.axes) (s : State C A) :
+    composeMonotone ((p1.combine p2).cat1 a) s = composeMonotone (p1.cat1 a) s := by
+  rw [disjoint_packages_noninterference_cat1 p1 p2 a h_not_in_p2]
+
+/-- **Theorem 4.3: Shared-axis confluence.**
+Under the hypothesis that `p1`'s and `p2`'s Cat1 rules confluence on
+shared axes (rule order does not affect the result), the combined
+Cat1 composition on every shared axis equals the swapped composition
+(`p2.combine p1`'s composition). The combined fixpoint on shared axes
+is therefore order-invariant in the package combination. -/
 theorem shared_axis_confluence
     (p1 p2 : Package C A)
     (shared : Finset A)
     (_h_shared : shared = p1.axes ∩ p2.axes)
-    (_h_confluent : ∀ a ∈ shared, ∀ s : State C A,
+    (h_confluent : ∀ a ∈ shared, ∀ s : State C A,
       composeMonotone (p1.cat1 a) (composeMonotone (p2.cat1 a) s) =
       composeMonotone (p2.cat1 a) (composeMonotone (p1.cat1 a) s)) :
-    -- Then the combined fixpoint on shared axes is unique
-    True := by
-  trivial
+    ∀ a ∈ shared, ∀ s : State C A,
+      composeMonotone ((p1.combine p2).cat1 a) s =
+      composeMonotone ((p2.combine p1).cat1 a) s := by
+  intro a h_a_shared s
+  rw [combine_composeMonotone, combine_composeMonotone]
+  exact (h_confluent a h_a_shared s).symm
